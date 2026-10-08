@@ -1,0 +1,92 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const P = require('../payment.js');
+
+// 월·수 수업, 2시간, 8회 / 2026-10-05(월) 시작
+const base = () => ({
+  name: '김지음',
+  minutes: 120,
+  cycle: 8,
+  days: [1, 3],
+  startDate: '2026-10-05',
+  events: [],
+  history: [],
+});
+
+test('예외 없음: 8회 = 4주', () => {
+  const r = P.computeCycle(base(), [], '2026-10-05');
+  assert.equal(r.sessions.length, 8);
+  assert.equal(r.lastDate, '2026-10-28');
+  assert.equal(r.nextDate, '2026-11-02');
+  assert.equal(r.done, 1);
+  assert.equal(P.buildMessage(base(), r), '2시간 * 8회\n수업 시작일: 2026.10.05');
+});
+
+test('휴강·이월 결강은 결제일을 미루고, 차감 결강은 미루지 않는다', () => {
+  const s = base();
+  s.events = [
+    { type: '결강', date: '2026-10-12', reason: '병결', counted: false },
+    { type: '결강', date: '2026-10-14', reason: '무단', counted: true },
+  ];
+  const holidays = [{ date: '2026-10-07', reason: '학원 휴무' }];
+  const r = P.computeCycle(s, holidays);
+  assert.equal(r.sessions.length, 8);
+  // 휴강 1 + 이월 결강 1 → 2회 밀림
+  assert.equal(r.lastDate, '2026-11-04');
+  assert.equal(r.nextDate, '2026-11-09');
+  assert.ok(r.sessions.some((x) => x.date === '2026-10-14' && x.kind === '결강'));
+  assert.equal(
+    P.buildMessage(s, r),
+    '2시간 * 8회\n수업 시작일: 2026.10.05\n--\n휴강: 10/07(학원 휴무)\n결강: 10/12(병결), 10/14(무단, 회차 차감)'
+  );
+});
+
+test('대체수업은 원래 날짜 대신 옮긴 날짜를 회차로 센다', () => {
+  const s = base();
+  s.events = [{ type: '대체', date: '2026-10-12', toDate: '2026-10-17', reason: '학교 행사' }];
+  const r = P.computeCycle(s, []);
+  assert.equal(r.lastDate, '2026-10-28');
+  assert.ok(!r.sessions.some((x) => x.date === '2026-10-12'));
+  assert.ok(r.sessions.some((x) => x.date === '2026-10-17' && x.kind === '대체'));
+  assert.match(P.buildMessage(s, r), /대체수업: 10\/12\(학교 행사\) → 10\/17$/);
+});
+
+test('수업 요일이 아닌 전체 휴강은 영향 없음', () => {
+  const r = P.computeCycle(base(), [{ date: '2026-10-09', reason: '한글날' }]);
+  assert.equal(r.lastDate, '2026-10-28');
+  assert.equal(r.exceptions.length, 0);
+});
+
+test('마지막 회차 뒤 휴강도 메시지에 포함되고 다음 시작일을 미룬다', () => {
+  const r = P.computeCycle(base(), [{ date: '2026-11-02', reason: '휴무' }]);
+  assert.equal(r.nextDate, '2026-11-04');
+  assert.equal(r.exceptions.length, 1);
+});
+
+test('결제일 기준 설정', () => {
+  const r = P.computeCycle(base(), []);
+  assert.equal(P.dueDate(r, {}), '2026-11-02');
+  assert.equal(P.dueDate(r, { dueBasis: 'last' }), '2026-10-28');
+});
+
+test('머리말/맺음말 치환', () => {
+  const r = P.computeCycle(base(), []);
+  const msg = P.buildMessage(base(), r, { prefix: '{이름} 학부모님 안녕하세요.', suffix: '결제일: {결제일}' });
+  assert.equal(msg, '김지음 학부모님 안녕하세요.\n\n2시간 * 8회\n수업 시작일: 2026.10.05\n\n결제일: 2026.11.02');
+});
+
+test('결제 완료 → 다음 회차, 되돌리기', () => {
+  const s = base();
+  const r = P.computeCycle(s, []);
+  const s2 = P.advance(s, r, '2026-10-28');
+  assert.equal(s2.startDate, '2026-11-02');
+  assert.equal(s2.history.length, 1);
+  assert.equal(P.computeCycle(s2, []).lastDate, '2026-11-25');
+  assert.equal(P.undoAdvance(s2).startDate, '2026-10-05');
+});
+
+test('시간 표기', () => {
+  assert.equal(P.formatMinutes(90), '1시간 30분');
+  assert.equal(P.formatMinutes(50), '50분');
+  assert.equal(P.formatMinutes(180), '3시간');
+});
