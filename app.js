@@ -40,6 +40,8 @@
   const daysText = (days) => [...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => P.WEEKDAYS[d]).join('·');
   const findStudent = (id) => state.students.find((s) => s.id === id);
   const calc = (s) => P.computeCycle(s, state.holidays);
+  const byName = (a, b) => a.name.localeCompare(b.name, 'ko');
+  const byMinutesThenName = (a, b) => Number(a.minutes) - Number(b.minutes) || byName(a, b);
   const feeText = (s) => (s.fee != null ? Number(s.fee).toLocaleString('ko-KR') + '원' : '-');
 
   /* ---------- 탭 ---------- */
@@ -296,7 +298,8 @@
 
   function renderStudents() {
     $('stu-body').innerHTML = state.students.length
-      ? state.students
+      ? [...state.students]
+          .sort(byMinutesThenName)
           .map(
             (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
         <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td>${feeText(s)}</td><td class="muted">${esc(s.memo)}</td>
@@ -330,7 +333,8 @@
 
   const studentChecks = (selected) =>
     state.students.length
-      ? state.students
+      ? [...state.students]
+          .sort(byName)
           .map((s) => `<label class="inline"><input type="checkbox" value="${s.id}" ${selected.includes(s.id) ? 'checked' : ''}>${esc(s.name)}</label>`)
           .join('')
       : '<span class="muted">등록된 학생이 없습니다.</span>';
