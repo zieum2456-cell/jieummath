@@ -49,8 +49,9 @@
 
   function renderTimetable() {
     const rows = T.SLOTS.length;
+    const lanes = T.assignLanes(state.students);
     $('timetable').innerHTML = T.DAYS.map(({ day, label }) => {
-      const d = T.buildDay(state.students, day);
+      const d = T.buildDay(state.students, day, lanes);
       const times = T.SLOTS.map((slot, i) => {
         const c = d.counts[i];
         return `<div class="${slot.end - slot.start === 60 ? 'hour' : ''}"><span>${T.fmtTime(slot.start)}</span><span class="cnt${c ? '' : ' zero'}">${c}명</span></div>`;
