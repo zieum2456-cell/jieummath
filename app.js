@@ -40,6 +40,7 @@
   const daysText = (days) => [...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => P.WEEKDAYS[d]).join('·');
   const findStudent = (id) => state.students.find((s) => s.id === id);
   const calc = (s) => P.computeCycle(s, state.holidays);
+  const feeText = (s) => (s.fee != null ? Number(s.fee).toLocaleString('ko-KR') + '원' : '-');
 
   /* ---------- 탭 ---------- */
   const TABS = ['dashboard', 'students', 'holidays', 'settings', 'detail'];
@@ -81,10 +82,11 @@
         <td>${r.done} / ${r.total}</td>
         <td>${r.lastDate ? P.fmtMDW(r.lastDate) : '-'}</td>
         <td>${due ? P.fmtMDW(due) : '-'}</td>
+        <td>${feeText(s)}</td>
         <td>${dueBadge(due)}</td></tr>`
           )
           .join('')
-      : '<tr><td colspan="6" class="empty">학생 관리 탭에서 학생을 추가해 주세요.</td></tr>';
+      : '<tr><td colspan="7" class="empty">학생 관리 탭에서 학생을 추가해 주세요.</td></tr>';
     $('dash-body').querySelectorAll('tr.click').forEach((tr) =>
       tr.addEventListener('click', () => {
         currentId = tr.dataset.id;
@@ -297,7 +299,7 @@
       ? state.students
           .map(
             (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
-        <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td>${s.fee != null ? Number(s.fee).toLocaleString('ko-KR') + '원' : '-'}</td><td class="muted">${esc(s.memo)}</td>
+        <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td>${feeText(s)}</td><td class="muted">${esc(s.memo)}</td>
         <td style="white-space:nowrap;text-align:right">
           <button class="btn small" data-open="${s.id}">보기</button>
           <button class="btn small" data-edit="${s.id}">수정</button>
