@@ -21,6 +21,9 @@
     display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   header h1 { margin: 0; font-size: 18px; }
   header a { color: var(--accent); text-decoration: none; font-size: 14px; }
+  .cloud { display: flex; gap: 6px; align-items: center; }
+  .cloud-status { font-size: 13px; color: var(--muted); }
+  .cloud-status.err { color: var(--danger); }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   main { max-width: 1200px; margin: 0 auto; padding: 16px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
@@ -104,6 +107,7 @@
 <header>
   <h1>수업 시간표</h1>
   <div class="actions">
+    <div id="cloud" class="cloud"></div>
     <a href="payment.html">결제일 관리 →</a>
     <button class="btn primary" id="btn-print">인쇄 / PDF 저장</button>
   </div>
@@ -150,10 +154,12 @@
       </div>
     </div>
     <div class="table-wrap"><table id="stu-table"></table></div>
-    <p class="muted">데이터는 이 브라우저 안(localStorage)에만 저장됩니다. 다른 컴퓨터로 옮기기 전에 백업 파일을 받아 두세요.</p>
+    <p class="muted">데이터는 이 브라우저 안(localStorage)에 저장되고, 구글 로그인을 하면 온라인에도 저장되어 다른 기기에서 같이 쓸 수 있습니다. 가끔 백업 파일도 받아 두세요.</p>
   </div>
 </main>
 
+<script src="firebase-config.js"></script>
+<script src="cloud.js"></script>
 <script src="timetable.js"></script>
 <script src="timetable-app.js"></script>
 </body>

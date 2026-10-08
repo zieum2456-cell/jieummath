@@ -9,17 +9,18 @@
   let state = load();
   let editingId = null;
 
+  function normalize(s) {
+    return { students: Array.isArray(s && s.students) ? s.students : [] };
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (raw) {
-        const s = JSON.parse(raw);
-        return { students: Array.isArray(s.students) ? s.students : [] };
-      }
+      if (raw) return normalize(JSON.parse(raw));
     } catch (e) {
       console.error(e);
     }
-    return { students: [] };
+    return normalize(null);
   }
 
   function save() {
@@ -28,6 +29,19 @@
     } catch (e) {
       alert('저장에 실패했습니다. 백업 파일을 받아 두세요.\n' + e.message);
     }
+    if (window.Cloud) window.Cloud.push();
+  }
+
+  // 다른 기기에서 바뀐 내용(온라인 저장)을 받았을 때
+  function applyRemote(data) {
+    state = normalize(data);
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.error(e);
+    }
+    if (editingId && !state.students.some((s) => s.id === editingId)) resetForm();
+    render();
   }
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -270,7 +284,7 @@
       const data = JSON.parse(await file.text());
       if (!Array.isArray(data.students) || data.holidays) throw new Error('시간표 백업 파일이 아닙니다.');
       if (!confirm(`백업의 학생 ${data.students.length}명으로 지금 시간표를 바꿀까요?`)) return;
-      state = { students: data.students };
+      state = normalize(data);
       save();
       resetForm();
       render();
@@ -282,4 +296,15 @@
   $('btn-print').addEventListener('click', () => window.print());
 
   render();
+
+  if (window.Cloud) {
+    window.Cloud.attach({
+      key: 'timetable',
+      label: '수업 시간표',
+      storeKey: STORE_KEY,
+      mount: $('cloud'),
+      getState: () => state,
+      applyRemote,
+    });
+  }
 })();
