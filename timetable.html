@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수업 시간표</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1f2328; --muted: #6b7280; --line: #e5e7eb; --line-strong: #cbd2db;
+    --accent: #2563eb; --accent-soft: #e8efff; --danger: #dc2626;
+    --row: 24px; --bar-l: 88%; --bar-border-l: 42%; --bar-s: 70%;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111418; --card: #1a1e24; --text: #e6e8eb; --muted: #9aa3ad; --line: #2c323a; --line-strong: #444c57;
+      --accent: #6b9bff; --accent-soft: #1f2a44; --bar-l: 28%; --bar-border-l: 60%; --bar-s: 40%; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 16px; position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; }
+  header a { color: var(--accent); text-decoration: none; font-size: 14px; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 16px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .hidden { display: none !important; }
+  input, select { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  button.btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn.danger { color: var(--danger); }
+  button.btn.small { padding: 2px 8px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .table-wrap { overflow-x: auto; }
+  .empty { text-align: center; color: var(--muted); padding: 24px; }
+
+  /* ---------- 시간표 ---------- */
+  .tt-title { display: none; margin: 0 0 8px; font-size: 16px; }
+  .timetable { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .timetable { grid-template-columns: 1fr; } }
+  .day { border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; background: var(--card); min-width: 0; }
+  .day-head { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 10px;
+    background: var(--accent-soft); border-bottom: 1px solid var(--line-strong); }
+  .day-head b { font-size: 15px; color: var(--accent); }
+  .day-head span { font-size: 12px; color: var(--muted); }
+  .day-body { display: flex; }
+  .times { flex: 0 0 78px; border-right: 1px solid var(--line-strong); }
+  .times div { height: var(--row); display: flex; justify-content: space-between; align-items: center; padding: 0 6px;
+    font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  .times div:last-child { border-bottom: 0; }
+  .times div.hour { background: rgba(127, 127, 127, .07); }
+  .times .cnt { color: var(--muted); font-size: 11px; }
+  .times .cnt.zero { visibility: hidden; }
+  .lanes { position: relative; flex: 1; min-width: 0; }
+  .lanes .grid { height: var(--row); border-bottom: 1px solid var(--line); }
+  .lanes .grid:last-of-type { border-bottom: 0; }
+  .lanes .grid.on-hour { border-bottom-color: var(--line-strong); }
+  .lanes .grid.hour { background: rgba(127, 127, 127, .07); }
+  .bar { position: absolute; padding: 1px 2px; overflow: hidden; cursor: pointer;
+    background: hsl(var(--h) var(--bar-s) var(--bar-l)); border: 1px solid hsl(var(--h) 55% var(--bar-border-l));
+    border-radius: 5px; font-size: 12px; line-height: 1.25; text-align: center; color: var(--text); }
+  .bar:hover { outline: 2px solid var(--accent); z-index: 2; }
+  .bar b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar small { display: block; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .no-class { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+
+  /* ---------- 학생 입력 ---------- */
+  .form-top { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  .day-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 16px; margin-bottom: 12px; }
+  .day-row { display: flex; align-items: center; gap: 6px; }
+  .day-row b { width: 20px; }
+  .day-row button { white-space: nowrap; }
+  .err { color: var(--danger); font-size: 13px; min-height: 1.5em; }
+  td.t { font-variant-numeric: tabular-nums; font-size: 14px; }
+
+  @media print {
+    @page { size: A4 portrait; margin: 8mm; }
+    :root { --bg: #fff; --card: #fff; --text: #000; --muted: #555; --line: #ddd; --line-strong: #999;
+      --accent: #1d4ed8; --accent-soft: #eef2ff; --bar-l: 88%; --bar-border-l: 42%; --bar-s: 70%;
+      --row: 6.4mm; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: #fff; font-size: 12px; }
+    header, .no-print { display: none !important; }
+    main { max-width: none; padding: 0; }
+    .card.tt-card { border: 0; padding: 0; margin: 0; }
+    .tt-title { display: block; }
+    .timetable { grid-template-columns: 1fr 1fr; gap: 3mm; }
+    .day { break-inside: avoid; border-radius: 4px; }
+    .day-head { padding: 1px 8px; }
+    .times { flex-basis: 62px; }
+    .times div { padding: 0 4px; font-size: 11px; }
+    .times .cnt { font-size: 9px; }
+    .bar { font-size: 10px; }
+    .bar small { font-size: 8px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>수업 시간표</h1>
+  <div class="actions">
+    <a href="payment.html">결제일 관리 →</a>
+    <button class="btn primary" id="btn-print">인쇄 / PDF 저장</button>
+  </div>
+</header>
+
+<main>
+  <div class="card tt-card">
+    <h2 class="tt-title" id="tt-title">수업 시간표</h2>
+    <div class="timetable" id="timetable"></div>
+    <p class="muted no-print" style="margin:8px 0 0">시간 옆 숫자는 그 시간에 있는 학생 수입니다. 막대를 누르면 그 학생을 수정할 수 있습니다.</p>
+  </div>
+
+  <div class="card no-print" id="form-card">
+    <h2 id="form-title">학생 추가</h2>
+    <div class="form-top">
+      <label>이름 <input id="f-name" autocomplete="off" placeholder="이름"></label>
+      <label>기본 수업시간 (등원 시각을 고르면 하원 시각 자동 입력)
+        <select id="f-length">
+          <option value="60">60분</option>
+          <option value="90">90분</option>
+          <option value="120" selected>120분</option>
+          <option value="150">150분</option>
+          <option value="180">180분</option>
+        </select>
+      </label>
+    </div>
+    <div class="day-rows" id="f-days"></div>
+    <div class="err" id="f-err"></div>
+    <div class="actions">
+      <button class="btn primary" id="f-save">추가</button>
+      <button class="btn hidden" id="f-cancel">취소</button>
+      <button class="btn danger hidden" id="f-delete">삭제</button>
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 style="margin:0">학생 목록 <span id="stu-count" class="muted"></span></h2>
+      <div class="actions">
+        <button class="btn small" id="btn-import">결제일 관리 학생 이름 불러오기</button>
+        <button class="btn small" id="btn-export">백업 파일 받기</button>
+        <button class="btn small" id="btn-restore">백업 불러오기</button>
+        <input type="file" id="restore-file" accept="application/json,.json" class="hidden">
+      </div>
+    </div>
+    <div class="table-wrap"><table id="stu-table"></table></div>
+    <p class="muted">데이터는 이 브라우저 안(localStorage)에만 저장됩니다. 다른 컴퓨터로 옮기기 전에 백업 파일을 받아 두세요.</p>
+  </div>
+</main>
+
+<script src="timetable.js"></script>
+<script src="timetable-app.js"></script>
+</body>
+</html>
