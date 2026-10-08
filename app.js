@@ -97,6 +97,7 @@
   function sessionNote(x) {
     if (x.kind === '결강') return `<span class="kind-결강">결강 · 회차 차감${x.reason ? ' (' + esc(x.reason) + ')' : ''}</span>`;
     if (x.kind === '대체') return `<span class="kind-대체">대체수업 ← ${P.fmtMD(x.from)}</span>`;
+    if (x.kind === '보충') return `<span class="kind-대체">보충수업${x.reason ? ' (' + esc(x.reason) + ')' : ''}</span>`;
     return '';
   }
 
@@ -129,7 +130,7 @@
     // 수업 일정 (회차 + 예외를 날짜순으로)
     const rows = [
       ...r.sessions.map((x) => ({ date: x.date, no: x.no, note: sessionNote(x) })),
-      ...r.exceptions.filter((ex) => !(ex.type === '결강' && ex.counted)).map((ex) => ({ date: ex.date, no: '-', note: exceptionNote(ex) })),
+      ...r.exceptions.filter((ex) => !(ex.type === '결강' && ex.counted) && ex.type !== '보충').map((ex) => ({ date: ex.date, no: '-', note: exceptionNote(ex) })),
     ].sort((a, b) => a.date.localeCompare(b.date) || (a.no === '-' ? -1 : 1));
     if (r.nextDate) rows.push({ date: r.nextDate, no: '다음', note: '<b>다음 회차 시작</b>' });
     $('sess').innerHTML = rows
@@ -183,6 +184,7 @@
       '결강-이월': '학생이 빠졌지만 회차를 이월해 주는 결강. 결제일이 미뤄집니다.',
       '결강-차감': '학생이 빠졌지만 회차로 인정(차감)하는 결강. 결제일이 미뤄지지 않습니다.',
       대체: '원래 수업일 대신 다른 날 수업. 대체한 날이 회차로 계산됩니다.',
+      보충: '정규 수업 외에 추가로 진행한 수업. 회차 1회가 추가되어 결제일이 앞당겨집니다.',
     }[t];
   }
   $('ev-type').addEventListener('change', updateEventForm);
@@ -195,9 +197,10 @@
     const reason = $('ev-reason').value.trim();
     if (!date) return alert('날짜를 입력해 주세요.');
     if (t === '대체' && !toDate) return alert('대체 날짜를 입력해 주세요.');
-    if (!s.days.includes(P.weekday(date)) && !confirm(`${P.fmtMDW(date)}은(는) ${s.name} 학생의 등원 요일이 아닙니다. 그래도 등록할까요?\n(등원 요일이 아니면 계산에 반영되지 않습니다.)`)) return;
+    if (t !== '보충' && !s.days.includes(P.weekday(date)) && !confirm(`${P.fmtMDW(date)}은(는) ${s.name} 학생의 등원 요일이 아닙니다. 그래도 등록할까요?\n(등원 요일이 아니면 계산에 반영되지 않습니다.)`)) return;
     const type = t.startsWith('결강') ? '결강' : t;
-    if (s.events.some((ev) => ev.type !== '대체' && type !== '대체' && ev.date === date) &&
+    const single = (x) => x !== '대체' && x !== '보충';
+    if (single(type) && s.events.some((ev) => single(ev.type) && ev.date === date) &&
         !confirm('같은 날짜에 이미 등록된 내역이 있습니다. 추가할까요?')) return;
     const ev = { id: uid(), type, date, reason };
     if (type === '결강') ev.counted = t === '결강-차감';

@@ -14,6 +14,7 @@
  *     { id, type: '휴강', date, reason },
  *     { id, type: '결강', date, reason, counted: false }, // counted=true 면 회차 차감(이월 안 함)
  *     { id, type: '대체', date, toDate, reason },          // date 수업을 toDate 로 옮김
+ *     { id, type: '보충', date, reason },                  // date 에 회차 1회 추가
  *   ],
  *   history: [{ start, last, next, paidAt }],
  * }
@@ -114,13 +115,21 @@
       }
     }
 
+    // 보충수업: 요일과 관계없이 회차 1회 추가
+    for (const ev of events) {
+      if (ev.type === '보충' && ev.date === date) {
+        sessions.push({ date, kind: '보충', reason: ev.reason || '' });
+        exceptions.push({ type: '보충', date, reason: ev.reason || '' });
+      }
+    }
+
     return { sessions, exceptions };
   }
 
   /**
    * 현재 회차(startDate 부터 cycle 회)를 계산한다.
    * - sessions: 회차로 인정되는 수업 목록 (회차 차감 결강 포함)
-   * - exceptions: 휴강/결강/대체 목록 (startDate ~ 다음 회차 시작 전날)
+   * - exceptions: 휴강/결강/대체/보충 목록 (startDate ~ 다음 회차 시작 전날)
    * - lastDate: 마지막(N번째) 회차 날짜
    * - nextDate: 다음 회차 첫 수업일
    */
@@ -189,6 +198,7 @@
       ['휴강', '휴강'],
       ['결강', '결강'],
       ['대체', '대체수업'],
+      ['보충', '보충'],
     ];
     const body = [];
     for (const [type, label] of groups) {

@@ -44,7 +44,7 @@
   label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
   label.inline { flex-direction: row; align-items: center; gap: 6px; color: var(--text); font-size: 14px; }
   input, select, textarea { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
-  textarea { width: 100%; min-height: 160px; resize: vertical; }
+  textarea { width: 100%; min-height: 200px; resize: vertical; }
   button.btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
   button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.btn.danger { color: var(--danger); }
@@ -102,7 +102,7 @@
     <div class="grid2">
       <div>
         <div class="card">
-          <h2>휴강 · 결강 · 대체수업 등록</h2>
+          <h2>휴강 · 결강 · 대체수업 · 보충 등록</h2>
           <div class="row">
             <label>구분
               <select id="ev-type">
@@ -110,6 +110,7 @@
                 <option value="결강-이월">결강 (회차 이월)</option>
                 <option value="결강-차감">결강 (회차 차감)</option>
                 <option value="대체">대체수업</option>
+                <option value="보충">보충수업 (회차 추가)</option>
               </select>
             </label>
             <label><span id="ev-date-label">날짜</span><input type="date" id="ev-date"></label>

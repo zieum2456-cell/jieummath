@@ -95,3 +95,18 @@ test('결제 기준 표기', () => {
   assert.equal(P.cycleLabel(12), '12회(주3일)');
   assert.equal(P.cycleLabel(8), '8회(주2일)');
 });
+
+test('보충수업은 회차를 1회 추가하고 메시지에 대체수업 다음 줄로 표시된다', () => {
+  const s = base();
+  s.events = [
+    { type: '대체', date: '2026-10-12', toDate: '2026-10-17', reason: '학교 행사' },
+    { type: '보충', date: '2026-10-10', reason: '' },
+    { type: '보충', date: '2026-10-24', reason: '진도 보강' },
+  ];
+  const r = P.computeCycle(s, []);
+  // 보충 2회 추가 → 정규 수업 2회 일찍 끝남
+  assert.equal(r.lastDate, '2026-10-24');
+  assert.equal(r.nextDate, '2026-10-26');
+  assert.ok(r.sessions.some((x) => x.date === '2026-10-10' && x.kind === '보충'));
+  assert.match(P.buildMessage(s, r), /대체수업: 10\/12\(학교 행사\) → 10\/17\n보충: 10\/10, 10\/24\(진도 보강\)$/);
+});
