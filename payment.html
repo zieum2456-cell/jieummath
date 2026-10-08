@@ -165,6 +165,7 @@
         </label>
         <label>등원 요일<div class="days" id="f-days"></div></label>
         <label>이번 회차 수업 시작일<input id="f-start" type="date" required></label>
+        <label>원비(원)<input id="f-fee" type="number" min="0" step="1000" placeholder="예: 350000" style="width:120px"></label>
         <label style="flex:1 1 160px">메모<input id="f-memo"></label>
         <button class="btn primary" type="submit">저장</button>
         <button class="btn" type="button" id="f-cancel">취소</button>
@@ -173,7 +174,7 @@
     <div class="card">
       <h2>학생 목록</h2>
       <div class="table-wrap"><table>
-        <thead><tr><th>이름</th><th>요일</th><th>수업시간</th><th>결제 기준</th><th>회차 시작일</th><th>메모</th><th></th></tr></thead>
+        <thead><tr><th>이름</th><th>요일</th><th>수업시간</th><th>결제 기준</th><th>회차 시작일</th><th>원비</th><th>메모</th><th></th></tr></thead>
         <tbody id="stu-body"></tbody>
       </table></div>
     </div>

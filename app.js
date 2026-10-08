@@ -260,6 +260,7 @@
     $('f-min').value = s ? s.minutes : 120;
     $('f-cycle').value = s ? String(s.cycle) : '12';
     $('f-start').value = s ? s.startDate : P.today();
+    $('f-fee').value = s && s.fee != null ? s.fee : '';
     $('f-memo').value = s ? s.memo || '' : '';
     $('f-days').querySelectorAll('input').forEach((c) => (c.checked = s ? s.days.includes(Number(c.value)) : false));
   }
@@ -274,6 +275,7 @@
       cycle: Number($('f-cycle').value),
       days,
       startDate: $('f-start').value,
+      fee: $('f-fee').value === '' ? null : Number($('f-fee').value),
       memo: $('f-memo').value.trim(),
     };
     const id = $('f-id').value;
@@ -290,14 +292,14 @@
       ? state.students
           .map(
             (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
-        <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td class="muted">${esc(s.memo)}</td>
+        <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td>${s.fee != null ? Number(s.fee).toLocaleString('ko-KR') + '원' : '-'}</td><td class="muted">${esc(s.memo)}</td>
         <td style="white-space:nowrap;text-align:right">
           <button class="btn small" data-open="${s.id}">보기</button>
           <button class="btn small" data-edit="${s.id}">수정</button>
           <button class="btn small danger" data-remove="${s.id}">삭제</button></td></tr>`
           )
           .join('')
-      : '<tr><td colspan="7" class="empty">등록된 학생이 없습니다.</td></tr>';
+      : '<tr><td colspan="8" class="empty">등록된 학생이 없습니다.</td></tr>';
     const on = (attr, fn) => $('stu-body').querySelectorAll(`[data-${attr}]`).forEach((b) => b.addEventListener('click', () => fn(b.dataset[attr])));
     on('open', (id) => {
       currentId = id;
