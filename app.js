@@ -13,14 +13,16 @@
 
   let state = load();
   let currentId = null;
+  let currentTab = 'dashboard';
+
+  function normalize(s) {
+    return { ...DEFAULT_STATE, ...s, settings: { ...DEFAULT_STATE.settings, ...(s.settings || {}) } };
+  }
 
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (raw) {
-        const s = JSON.parse(raw);
-        return { ...DEFAULT_STATE, ...s, settings: { ...DEFAULT_STATE.settings, ...(s.settings || {}) } };
-      }
+      if (raw) return normalize(JSON.parse(raw));
     } catch (e) {
       console.error(e);
     }
@@ -34,6 +36,20 @@
     } catch (e) {
       alert('저장에 실패했습니다. 백업 파일을 받아 두세요.\n' + e.message);
     }
+    if (window.Cloud) window.Cloud.push();
+  }
+
+  // 다른 기기에서 바뀐 내용(온라인 저장)을 받았을 때
+  function applyRemote(data) {
+    state = normalize(data);
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.error(e);
+    }
+    updateStudentCount();
+    if (currentTab === 'detail' && !findStudent(currentId)) show('dashboard');
+    else show(currentTab, { keepScroll: true });
   }
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -51,7 +67,8 @@
     $('stu-count').textContent = `(${state.students.length})`;
   }
 
-  function show(tab) {
+  function show(tab, { keepScroll = false } = {}) {
+    currentTab = tab;
     TABS.forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== tab));
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     if (tab === 'dashboard') renderDashboard();
@@ -59,7 +76,7 @@
     if (tab === 'holidays') renderHolidays();
     if (tab === 'settings') renderSettings();
     if (tab === 'detail') renderDetail();
-    window.scrollTo(0, 0);
+    if (!keepScroll) window.scrollTo(0, 0);
   }
   document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
 
@@ -447,7 +464,7 @@
       const data = JSON.parse(await file.text());
       if (!Array.isArray(data.students)) throw new Error('형식이 올바르지 않습니다.');
       if (!confirm(`학생 ${data.students.length}명의 데이터로 현재 데이터를 덮어쓸까요?`)) return;
-      state = { ...DEFAULT_STATE, ...data, settings: { ...DEFAULT_STATE.settings, ...(data.settings || {}) } };
+      state = normalize(data);
       save();
       alert('불러왔습니다.');
       show('dashboard');
@@ -462,4 +479,15 @@
   updateStudentCount();
   fillForm(null);
   show('dashboard');
+
+  if (window.Cloud) {
+    window.Cloud.attach({
+      key: 'payment',
+      label: '결제일 관리',
+      storeKey: STORE_KEY,
+      mount: $('cloud'),
+      getState: () => state,
+      applyRemote,
+    });
+  }
 })();
