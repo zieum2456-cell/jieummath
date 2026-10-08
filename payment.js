@@ -187,7 +187,7 @@
   function buildMessage(student, result, settings) {
     settings = settings || {};
     const lines = [];
-    lines.push(`${formatMinutes(student.minutes)} * ${student.cycle}회`);
+    lines.push(`${formatMinutes(student.minutes)} * ${cycleLabel(student.cycle)}`);
     lines.push(`수업 시작일: ${fmtDot(student.startDate)}`);
 
     const groups = [

@@ -19,7 +19,7 @@ test('예외 없음: 8회 = 4주', () => {
   assert.equal(r.lastDate, '2026-10-28');
   assert.equal(r.nextDate, '2026-11-02');
   assert.equal(r.done, 1);
-  assert.equal(P.buildMessage(base(), r), '2시간 * 8회\n수업 시작일: 2026.10.05');
+  assert.equal(P.buildMessage(base(), r), '2시간 * 8회(주2일)\n수업 시작일: 2026.10.05');
 });
 
 test('휴강·이월 결강은 결제일을 미루고, 차감 결강은 미루지 않는다', () => {
@@ -37,7 +37,7 @@ test('휴강·이월 결강은 결제일을 미루고, 차감 결강은 미루�
   assert.ok(r.sessions.some((x) => x.date === '2026-10-14' && x.kind === '결강'));
   assert.equal(
     P.buildMessage(s, r),
-    '2시간 * 8회\n수업 시작일: 2026.10.05\n--\n휴강: 10/07(학원 휴무)\n결강: 10/12(병결), 10/14(무단, 회차 차감)'
+    '2시간 * 8회(주2일)\n수업 시작일: 2026.10.05\n--\n휴강: 10/07(학원 휴무)\n결강: 10/12(병결), 10/14(무단, 회차 차감)'
   );
 });
 
@@ -72,7 +72,7 @@ test('결제일 기준 설정', () => {
 test('머리말/맺음말 치환', () => {
   const r = P.computeCycle(base(), []);
   const msg = P.buildMessage(base(), r, { prefix: '{이름} 학부모님 안녕하세요.', suffix: '결제일: {결제일}' });
-  assert.equal(msg, '김지음 학부모님 안녕하세요.\n\n2시간 * 8회\n수업 시작일: 2026.10.05\n\n결제일: 2026.11.02');
+  assert.equal(msg, '김지음 학부모님 안녕하세요.\n\n2시간 * 8회(주2일)\n수업 시작일: 2026.10.05\n\n결제일: 2026.11.02');
 });
 
 test('결제 완료 → 다음 회차, 되돌리기', () => {
