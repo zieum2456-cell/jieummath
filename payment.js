@@ -183,7 +183,7 @@
     settings = settings || {};
     const lines = [];
     lines.push(`${formatMinutes(student.minutes)} * ${cycleLabel(student.cycle)}`);
-    lines.push(`수업 시작일: ${fmtDot(student.startDate)}`);
+    lines.push(`수업 시작일: ${result.nextDate ? fmtDot(result.nextDate) : '-'}`); // 다음 회차 첫 수업일
 
     const groups = [
       ['휴강', '휴강'],
