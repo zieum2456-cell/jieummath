@@ -72,12 +72,7 @@
   }
 
   function formatMinutes(min) {
-    min = Number(min) || 0;
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    if (h && m) return `${h}시간 ${m}분`;
-    if (h) return `${h}시간`;
-    return `${m}분`;
+    return `${Number(min) || 0}분`;
   }
 
   /** 결제 기준 표기: 12회(주3일), 8회(주2일) */
@@ -187,7 +182,7 @@
   function buildMessage(student, result, settings) {
     settings = settings || {};
     const lines = [];
-    lines.push(`${Number(student.minutes) || 0}분 * ${cycleLabel(student.cycle)}`);
+    lines.push(`${formatMinutes(student.minutes)} * ${cycleLabel(student.cycle)}`);
     lines.push(`수업 시작일: ${fmtDot(student.startDate)}`);
 
     const groups = [

@@ -86,9 +86,9 @@ test('결제 완료 → 다음 회차, 되돌리기', () => {
 });
 
 test('시간 표기', () => {
-  assert.equal(P.formatMinutes(90), '1시간 30분');
+  assert.equal(P.formatMinutes(90), '90분');
   assert.equal(P.formatMinutes(50), '50분');
-  assert.equal(P.formatMinutes(180), '3시간');
+  assert.equal(P.formatMinutes(180), '180분');
 });
 
 test('결제 기준 표기', () => {
