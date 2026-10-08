@@ -28,6 +28,7 @@
   }
 
   function save() {
+    updateStudentCount();
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(state));
     } catch (e) {
@@ -46,6 +47,10 @@
 
   /* ---------- 탭 ---------- */
   const TABS = ['dashboard', 'students', 'holidays', 'settings', 'detail'];
+  function updateStudentCount() {
+    $('stu-count').textContent = `(${state.students.length})`;
+  }
+
   function show(tab) {
     TABS.forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== tab));
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
@@ -310,6 +315,10 @@
           )
           .join('')
       : '<tr><td colspan="8" class="empty">등록된 학생이 없습니다.</td></tr>';
+    const feeTotal = state.students.reduce((sum, s) => sum + (Number(s.fee) || 0), 0);
+    $('stu-foot').innerHTML = state.students.length
+      ? `<tr><td colspan="5">원비 합계</td><td>${feeTotal.toLocaleString('ko-KR')}원</td><td colspan="2"></td></tr>`
+      : '';
     const on = (attr, fn) => $('stu-body').querySelectorAll(`[data-${attr}]`).forEach((b) => b.addEventListener('click', () => fn(b.dataset[attr])));
     on('open', (id) => {
       currentId = id;
@@ -450,6 +459,7 @@
   });
 
   updateEventForm();
+  updateStudentCount();
   fillForm(null);
   show('dashboard');
 })();

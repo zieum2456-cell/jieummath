@@ -56,6 +56,7 @@
   .kind-결강 { color: var(--warn); } .kind-대체 { color: var(--accent); }
   .future { color: var(--muted); }
   .hidden { display: none !important; }
+  tfoot td { border-bottom: 0; border-top: 2px solid var(--line); font-weight: 600; }
   .checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .empty { text-align: center; color: var(--muted); padding: 24px; }
@@ -66,7 +67,7 @@
   <h1>결제일 관리</h1>
   <nav id="tabs">
     <button data-tab="dashboard" class="active">결제 현황</button>
-    <button data-tab="students">학생 관리</button>
+    <button data-tab="students">학생 관리<span id="stu-count"></span></button>
     <button data-tab="holidays">전체 휴강</button>
     <button data-tab="settings">설정 · 백업</button>
   </nav>
@@ -177,6 +178,7 @@
       <div class="table-wrap"><table>
         <thead><tr><th>이름</th><th>요일</th><th>수업시간</th><th>결제 기준</th><th>회차 시작일</th><th>원비</th><th>메모</th><th></th></tr></thead>
         <tbody id="stu-body"></tbody>
+        <tfoot id="stu-foot"></tfoot>
       </table></div>
     </div>
   </section>
