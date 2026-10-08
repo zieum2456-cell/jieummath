@@ -159,13 +159,13 @@
       <form id="student-form" class="row">
         <input type="hidden" id="f-id">
         <label>이름<input id="f-name" required size="8"></label>
-        <label>회당 수업시간(분)<input id="f-min" type="number" min="10" step="10" value="120" required style="width:90px"></label>
+        <label>회당 수업시간<select id="f-min"><option value="60">60분</option><option value="90">90분</option><option value="120" selected>120분</option></select></label>
         <label>결제 기준
           <select id="f-cycle"><option value="12">12회(주3일)</option><option value="8">8회(주2일)</option></select>
         </label>
         <label>등원 요일<div class="days" id="f-days"></div></label>
         <label>이번 회차 수업 시작일<input id="f-start" type="date" required></label>
-        <label>원비(원)<input id="f-fee" type="number" min="0" step="1000" placeholder="예: 350000" style="width:120px"></label>
+        <label>원비<input id="f-fee" inputmode="decimal" placeholder="예: 35만" style="width:100px"></label>
         <label style="flex:1 1 160px">메모<input id="f-memo"></label>
         <button class="btn primary" type="submit">저장</button>
         <button class="btn" type="button" id="f-cancel">취소</button>

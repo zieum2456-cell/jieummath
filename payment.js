@@ -76,6 +76,29 @@
     return `${Number(min) || 0}분`;
   }
 
+  /**
+   * 원비 입력값을 원 단위 숫자로 바꾼다.
+   * '35만', '35', '35.5만', '35만 5천', '350,000원' 모두 허용. 숫자만 쓰면 1만 미만은 만 원 단위로 본다.
+   * 비어 있으면 null, 해석할 수 없으면 NaN.
+   */
+  function parseFee(text) {
+    const s = String(text ?? '').replace(/[\s,원]/g, '');
+    if (!s) return null;
+    const m = s.match(/^(\d+(?:\.\d+)?)만(?:(\d+(?:\.\d+)?)(천)?)?$/);
+    if (m) return Math.round(Number(m[1]) * 10000 + (m[2] ? Number(m[2]) * (m[3] ? 1000 : 1) : 0));
+    if (/^\d+(\.\d+)?$/.test(s)) {
+      const n = Number(s);
+      return Math.round(n < 10000 ? n * 10000 : n);
+    }
+    return NaN;
+  }
+
+  /** 원 단위 원비를 입력란용 '35만' 형태로 */
+  function feeToInput(fee) {
+    if (fee == null || fee === '') return '';
+    return `${Number(fee) / 10000}만`;
+  }
+
   /** 결제 기준 표기: 12회(주3일), 8회(주2일) */
   const CYCLE_LABELS = { 12: '12회(주3일)', 8: '8회(주2일)' };
   function cycleLabel(cycle) {
@@ -251,6 +274,8 @@
     fmtMDW,
     formatMinutes,
     cycleLabel,
+    parseFee,
+    feeToInput,
     dayInfo,
     computeCycle,
     dueDate,

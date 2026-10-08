@@ -257,10 +257,13 @@
     $('form-title').textContent = s ? `학생 수정: ${s.name}` : '학생 추가';
     $('f-id').value = s ? s.id : '';
     $('f-name').value = s ? s.name : '';
-    $('f-min').value = s ? s.minutes : 120;
+    const min = String(s ? s.minutes : 120);
+    [...$('f-min').options].filter((o) => !['60', '90', '120'].includes(o.value)).forEach((o) => o.remove());
+    if (!['60', '90', '120'].includes(min)) $('f-min').add(new Option(`${min}분`, min)); // 예전에 입력한 다른 시간
+    $('f-min').value = min;
     $('f-cycle').value = s ? String(s.cycle) : '12';
     $('f-start').value = s ? s.startDate : P.today();
-    $('f-fee').value = s && s.fee != null ? s.fee : '';
+    $('f-fee').value = P.feeToInput(s && s.fee);
     $('f-memo').value = s ? s.memo || '' : '';
     $('f-days').querySelectorAll('input').forEach((c) => (c.checked = s ? s.days.includes(Number(c.value)) : false));
   }
@@ -269,13 +272,15 @@
     e.preventDefault();
     const days = [...$('f-days').querySelectorAll('input:checked')].map((c) => Number(c.value));
     if (!days.length) return alert('등원 요일을 하나 이상 선택해 주세요.');
+    const fee = P.parseFee($('f-fee').value);
+    if (Number.isNaN(fee)) return alert('원비는 35만처럼 입력해 주세요.');
     const data = {
       name: $('f-name').value.trim(),
       minutes: Number($('f-min').value),
       cycle: Number($('f-cycle').value),
       days,
       startDate: $('f-start').value,
-      fee: $('f-fee').value === '' ? null : Number($('f-fee').value),
+      fee,
       memo: $('f-memo').value.trim(),
     };
     const id = $('f-id').value;

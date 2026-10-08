@@ -110,3 +110,15 @@ test('보충수업은 회차를 1회 추가하고 메시지에 대체수업 다�
   assert.ok(r.sessions.some((x) => x.date === '2026-10-10' && x.kind === '보충'));
   assert.match(P.buildMessage(s, r), /대체수업: 10\/12\(학교 행사\) → 10\/17\n보충: 10\/10, 10\/24\(진도 보강\)$/);
 });
+
+test('원비 입력 해석', () => {
+  assert.equal(P.parseFee('35만'), 350000);
+  assert.equal(P.parseFee('35'), 350000);
+  assert.equal(P.parseFee('32.5만'), 325000);
+  assert.equal(P.parseFee('35만 5천'), 355000);
+  assert.equal(P.parseFee('350,000원'), 350000);
+  assert.equal(P.parseFee(''), null);
+  assert.ok(Number.isNaN(P.parseFee('삼십오만')));
+  assert.equal(P.feeToInput(350000), '35만');
+  assert.equal(P.feeToInput(null), '');
+});
