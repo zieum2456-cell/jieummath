@@ -326,14 +326,31 @@
   }
 
   /* ---------- 전체 휴강 ---------- */
+  let editingHolidayId = null;
+
+  const studentChecks = (selected) =>
+    state.students.length
+      ? state.students
+          .map((s) => `<label class="inline"><input type="checkbox" value="${s.id}" ${selected.includes(s.id) ? 'checked' : ''}>${esc(s.name)}</label>`)
+          .join('')
+      : '<span class="muted">등록된 학생이 없습니다.</span>';
+  const checkedIds = (el) => [...el.querySelectorAll('input:checked')].map((c) => c.value);
+
   $('h-add').addEventListener('click', () => {
     const start = $('h-date').value;
     const end = $('h-end').value || start;
     const reason = $('h-reason').value.trim();
+    const exclude = checkedIds($('h-exclude'));
     if (!start) return alert('날짜를 입력해 주세요.');
     if (end < start) return alert('종료일이 시작일보다 빠릅니다.');
-    for (let d = start; d <= end; d = P.addDays(d, 1)) {
-      if (!state.holidays.some((h) => h.date === d)) state.holidays.push({ id: uid(), date: d, reason });
+    const dates = [];
+    for (let d = start; d <= end; d = P.addDays(d, 1)) dates.push(d);
+    const dup = dates.filter((d) => state.holidays.some((h) => h.date === d));
+    if (dup.length && !confirm(`이미 등록된 날짜(${dup.map(P.fmtMD).join(', ')})는 새로 입력한 사유와 제외 학생으로 바꿀까요?`)) return;
+    for (const d of dates) {
+      const old = state.holidays.find((h) => h.date === d);
+      if (old) Object.assign(old, { reason, exclude });
+      else state.holidays.push({ id: uid(), date: d, reason, exclude });
     }
     state.holidays.sort((a, b) => a.date.localeCompare(b.date));
     save();
@@ -342,19 +359,43 @@
   });
 
   function renderHolidays() {
+    $('h-exclude').innerHTML = studentChecks([]);
+    const nameOf = (id) => (findStudent(id) || {}).name;
     $('h-list').innerHTML = state.holidays.length
       ? state.holidays
-          .map((h) => `<tr><td>${P.fmtDot(h.date)} (${P.WEEKDAYS[P.weekday(h.date)]})</td><td>${esc(h.reason)}</td>
-            <td style="text-align:right"><button class="btn small danger" data-del="${h.id}">삭제</button></td></tr>`)
+          .map((h) => {
+            const names = (h.exclude || []).map(nameOf).filter(Boolean);
+            const row = `<tr><td>${P.fmtDot(h.date)} (${P.WEEKDAYS[P.weekday(h.date)]})</td><td>${esc(h.reason)}</td>
+              <td class="muted">${names.length ? '제외: ' + names.map(esc).join(', ') : ''}</td>
+              <td style="text-align:right;white-space:nowrap"><button class="btn small" data-ex="${h.id}">제외 학생</button>
+              <button class="btn small danger" data-del="${h.id}">삭제</button></td></tr>`;
+            if (h.id !== editingHolidayId) return row;
+            return row + `<tr><td colspan="4"><div class="checks" id="h-ex-edit">${studentChecks(h.exclude || [])}</div>
+              <div style="margin-top:6px"><button class="btn small primary" data-ex-save="${h.id}">저장</button>
+              <button class="btn small" data-ex-cancel>취소</button></div></td></tr>`;
+          })
           .join('')
       : '<tr><td class="muted">없음</td></tr>';
-    $('h-list').querySelectorAll('[data-del]').forEach((b) =>
-      b.addEventListener('click', () => {
-        state.holidays = state.holidays.filter((h) => h.id !== b.dataset.del);
-        save();
-        renderHolidays();
-      })
-    );
+    const on = (attr, fn) => $('h-list').querySelectorAll(`[data-${attr}]`).forEach((b) => b.addEventListener('click', () => fn(b.dataset)));
+    on('del', (d) => {
+      state.holidays = state.holidays.filter((h) => h.id !== d.del);
+      save();
+      renderHolidays();
+    });
+    on('ex', (d) => {
+      editingHolidayId = editingHolidayId === d.ex ? null : d.ex;
+      renderHolidays();
+    });
+    on('ex-save', (d) => {
+      state.holidays.find((h) => h.id === d.exSave).exclude = checkedIds($('h-ex-edit'));
+      editingHolidayId = null;
+      save();
+      renderHolidays();
+    });
+    on('ex-cancel', () => {
+      editingHolidayId = null;
+      renderHolidays();
+    });
   }
 
   /* ---------- 설정 ---------- */

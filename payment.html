@@ -56,6 +56,7 @@
   .kind-결강 { color: var(--warn); } .kind-대체 { color: var(--accent); }
   .future { color: var(--muted); }
   .hidden { display: none !important; }
+  .checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .empty { text-align: center; color: var(--muted); padding: 24px; }
 </style>
@@ -184,13 +185,15 @@
   <section id="tab-holidays" class="hidden">
     <div class="card">
       <h2>전체 휴강 (공휴일 · 학원 휴무)</h2>
-      <p class="muted">여기 등록한 날짜는 그날 수업이 있는 모든 학생에게 휴강으로 적용됩니다.</p>
+      <p class="muted">여기 등록한 날짜는 그날 수업이 있는 모든 학생에게 휴강으로 적용됩니다. 제외할 학생을 선택하면 그 학생은 정상 수업으로 계산됩니다.</p>
       <div class="row">
         <label>시작일<input type="date" id="h-date"></label>
         <label>종료일(선택)<input type="date" id="h-end"></label>
         <label>사유<input id="h-reason" placeholder="예: 추석" size="10"></label>
         <button class="btn primary" id="h-add">추가</button>
       </div>
+      <h3>제외할 학생 (선택한 학생은 이 날 정상 수업)</h3>
+      <div class="checks" id="h-exclude"></div>
       <h3>등록된 휴강</h3>
       <table><tbody id="h-list"></tbody></table>
     </div>

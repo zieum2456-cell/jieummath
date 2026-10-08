@@ -18,7 +18,7 @@
  *   ],
  *   history: [{ start, last, next, paidAt }],
  * }
- * holidays = [{ id, date, reason }]  // 전체 휴강(공휴일, 방학 등) - 모든 학생에게 적용
+ * holidays = [{ id, date, reason, exclude: [studentId] }]  // 전체 휴강(공휴일, 방학 등) - exclude 학생 빼고 모두 적용
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -119,7 +119,7 @@
     }
 
     if ((student.days || []).includes(weekday(date))) {
-      const holiday = (holidays || []).find((h) => h.date === date);
+      const holiday = (holidays || []).find((h) => h.date === date && !(h.exclude || []).includes(student.id));
       const own = (type) => events.find((ev) => ev.type === type && ev.date === date);
       const closed = own('휴강');
       const moved = own('대체');

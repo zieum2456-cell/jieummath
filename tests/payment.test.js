@@ -122,3 +122,10 @@ test('원비 입력 해석', () => {
   assert.equal(P.feeToInput(350000), '35만');
   assert.equal(P.feeToInput(null), '');
 });
+
+test('전체 휴강에서 제외된 학생은 정상 수업', () => {
+  const s = { ...base(), id: 'kim' };
+  const holidays = [{ date: '2026-10-07', reason: '학원 휴무', exclude: ['kim'] }];
+  assert.equal(P.computeCycle(s, holidays).lastDate, '2026-10-28');
+  assert.equal(P.computeCycle({ ...s, id: 'lee' }, holidays).lastDate, '2026-11-02');
+});
