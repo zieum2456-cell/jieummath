@@ -90,3 +90,8 @@ test('시간 표기', () => {
   assert.equal(P.formatMinutes(50), '50분');
   assert.equal(P.formatMinutes(180), '3시간');
 });
+
+test('결제 기준 표기', () => {
+  assert.equal(P.cycleLabel(12), '12회(주3일)');
+  assert.equal(P.cycleLabel(8), '8회(주2일)');
+});

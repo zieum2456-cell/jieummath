@@ -80,6 +80,12 @@
     return `${m}분`;
   }
 
+  /** 결제 기준 표기: 12회(주3일), 8회(주2일) */
+  const CYCLE_LABELS = { 12: '12회(주3일)', 8: '8회(주2일)' };
+  function cycleLabel(cycle) {
+    return CYCLE_LABELS[cycle] || `${cycle}회`;
+  }
+
   /** 특정 날짜의 수업/예외 정보를 돌려준다. */
   function dayInfo(student, holidays, date) {
     const sessions = [];
@@ -239,6 +245,7 @@
     fmtDot,
     fmtMDW,
     formatMinutes,
+    cycleLabel,
     dayInfo,
     computeCycle,
     dueDate,

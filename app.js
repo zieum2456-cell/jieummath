@@ -77,7 +77,7 @@
           .map(
             ({ s, r, due }) => `<tr class="click" data-id="${s.id}">
         <td><b>${esc(s.name)}</b></td>
-        <td>${daysText(s.days)} · ${P.formatMinutes(s.minutes)} · ${s.cycle}회</td>
+        <td>${daysText(s.days)} · ${P.formatMinutes(s.minutes)} · ${P.cycleLabel(s.cycle)}</td>
         <td>${r.done} / ${r.total}</td>
         <td>${r.lastDate ? P.fmtMDW(r.lastDate) : '-'}</td>
         <td>${due ? P.fmtMDW(due) : '-'}</td>
@@ -116,7 +116,7 @@
 
     $('d-title').innerHTML = `${esc(s.name)} ${dueBadge(due)}`;
     $('d-summary').innerHTML = [
-      `${daysText(s.days)} · ${P.formatMinutes(s.minutes)} · ${s.cycle}회 결제`,
+      `${daysText(s.days)} · ${P.formatMinutes(s.minutes)} · ${P.cycleLabel(s.cycle)} 결제`,
       `수업 시작일 ${P.fmtDot(s.startDate)}`,
       `진행 ${r.done}/${r.total}회`,
       `마지막 회차 ${r.lastDate ? P.fmtMDW(r.lastDate) : '-'}`,
@@ -287,7 +287,7 @@
       ? state.students
           .map(
             (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
-        <td>${s.cycle}회</td><td>${P.fmtDot(s.startDate)}</td><td class="muted">${esc(s.memo)}</td>
+        <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td class="muted">${esc(s.memo)}</td>
         <td style="white-space:nowrap;text-align:right">
           <button class="btn small" data-open="${s.id}">보기</button>
           <button class="btn small" data-edit="${s.id}">수정</button>
