@@ -9,6 +9,7 @@
  * 앱에서 쓰는 법:
  *   Cloud.attach({ key, label, storeKey, mount, getState, applyRemote })
  *   Cloud.push()   // 앱이 저장할 때마다 호출
+ *   Cloud.watch(key, cb)   // 다른 앱의 데이터를 읽기만 할 때 (예: 시간표가 결제일 관리의 학년을 가져옴)
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -63,6 +64,7 @@
   let timer = null;
   let ready = false; // 로그인 직후 첫 맞추기가 끝났는지
   let status = 'off';
+  const watchers = []; // { key, cb, stop }
 
   const flagKey = (name) => `${opts.storeKey}-cloud-${name}`;
   const getFlag = (name) => { try { return localStorage.getItem(flagKey(name)); } catch (e) { return null; } };
@@ -137,11 +139,13 @@
     fb.onAuthStateChanged(auth, (u) => {
       if (unsubscribe) unsubscribe();
       unsubscribe = null;
+      watchers.forEach(stopWatcher);
       user = u;
       ready = false;
       lastJson = null;
       if (!u) return setStatus('off');
       connect();
+      watchers.forEach(startWatcher);
     });
     render();
   }
@@ -244,6 +248,31 @@
     }
   }
 
+  // 다른 앱 데이터 읽기 전용 구독 (로그인하면 시작, 로그아웃하면 멈춤)
+  function startWatcher(w) {
+    stopWatcher(w);
+    if (!fb || !user) return;
+    w.stop = fb.onSnapshot(fb.doc(db, 'users', user.uid, 'apps', w.key), (snap) => {
+      if (!snap.exists()) return;
+      try {
+        w.cb(JSON.parse(snap.data().json));
+      } catch (e) {
+        console.error(e);
+      }
+    }, (e) => console.error(e));
+  }
+
+  function stopWatcher(w) {
+    if (w.stop) w.stop();
+    w.stop = null;
+  }
+
+  function watch(key, cb) {
+    const w = { key, cb, stop: null };
+    watchers.push(w);
+    startWatcher(w);
+  }
+
   // 앱이 저장할 때마다 호출. 잠깐 모았다가 한 번에 올린다
   function push(now) {
     if (!user || !ready) return;
@@ -274,5 +303,5 @@
     }
   }
 
-  return { decide, attach, push, flush };
+  return { decide, attach, push, flush, watch };
 });
