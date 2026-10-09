@@ -48,6 +48,42 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const byName = (a, b) => a.name.localeCompare(b.name, 'ko');
 
+  /* ---------- 학년 (결제일 관리에서 이름으로 찾아옴) ---------- */
+  let grades = {}; // 이름 → 학년
+
+  function setGrades(payment) {
+    const next = {};
+    ((payment && payment.students) || []).forEach((p) => {
+      const name = String(p.name || '').trim();
+      if (name && p.grade && !(name in next)) next[name] = p.grade;
+    });
+    const changed = JSON.stringify(next) !== JSON.stringify(grades);
+    grades = next;
+    return changed;
+  }
+
+  function loadGradesLocal() {
+    try {
+      const raw = localStorage.getItem(PAYMENT_KEY);
+      return setGrades(raw ? JSON.parse(raw) : null);
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }
+
+  const gradeOf = (name) => grades[String(name || '').trim()] || '';
+  const gradeTag = (name) => {
+    const g = gradeOf(name);
+    return g ? `<span class="grade">${esc(g)}</span> ` : '';
+  };
+
+  loadGradesLocal();
+  // 같은 브라우저의 다른 탭에서 결제일 관리를 고친 경우
+  window.addEventListener('storage', (ev) => {
+    if (ev.key === PAYMENT_KEY && loadGradesLocal()) render();
+  });
+
   // 학생마다 고정 색 (이름이 아니라 id 기준이라 이름을 바꿔도 색이 유지됨)
   function hue(id) {
     let h = 0;
@@ -79,11 +115,11 @@
       const w = 100 / Math.max(d.lanes, 1);
       const bars = d.entries.map((e) => {
         const h = e.bottom - e.top;
-        const title = `${e.name} ${T.fmtTime(e.in)}~${T.fmtTime(e.out)}`;
+        const title = `${gradeOf(e.name) ? gradeOf(e.name) + ' ' : ''}${e.name} ${T.fmtTime(e.in)}~${T.fmtTime(e.out)}`;
         return `<div class="bar" data-id="${esc(e.id)}" title="${esc(title)}" style="--h:${hue(e.id).toFixed(0)};`
           + `top:calc(var(--row) * ${e.top} + 1px);height:calc(var(--row) * ${h} - 2px);`
           + `left:calc(${w * e.lane}% + 1px);width:calc(${w}% - 2px)">`
-          + `<b>${esc(e.name)}</b>${h >= 2 ? `<small>${T.fmtTime(e.in)}~${T.fmtTime(e.out)}</small>` : ''}</div>`;
+          + `<b>${gradeTag(e.name)}${esc(e.name)}</b>${h >= 2 ? `<small>${T.fmtTime(e.in)}~${T.fmtTime(e.out)}</small>` : ''}</div>`;
       }).join('');
       return `<section class="day">
         <div class="day-head"><b>${label}요일</b><span>${d.entries.length}명</span></div>
@@ -126,7 +162,7 @@
       return;
     }
     $('stu-table').innerHTML = `<thead><tr><th>이름</th>${T.DAYS.map((d) => `<th>${d.label}</th>`).join('')}<th></th></tr></thead><tbody>`
-      + list.map((s) => `<tr><td><b>${esc(s.name)}</b></td>${T.DAYS.map((d) => timeCell(s, d.day)).join('')}`
+      + list.map((s) => `<tr><td>${gradeTag(s.name)}<b>${esc(s.name)}</b></td>${T.DAYS.map((d) => timeCell(s, d.day)).join('')}`
         + `<td><button class="btn small" data-edit="${esc(s.id)}">수정</button></td></tr>`).join('')
       + '</tbody>';
   }
@@ -315,6 +351,10 @@
       mount: $('cloud'),
       getState: () => state,
       applyRemote,
+    });
+    // 로그인 상태면 결제일 관리의 학년도 온라인에서 바로 받아옴
+    window.Cloud.watch('payment', (data) => {
+      if (setGrades(data)) render();
     });
   }
 })();

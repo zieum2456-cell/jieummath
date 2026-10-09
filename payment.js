@@ -6,6 +6,7 @@
  *
  * student = {
  *   id, name,
+ *   grade: '중1',            // 학년 (GRADES 중 하나, 없으면 '')
  *   minutes: 120,            // 회당 수업시간(분)
  *   cycle: 12 | 8,           // 결제 기준 회차
  *   days: [1, 3, 5],         // 등원 요일 (0=일 ... 6=토)
@@ -27,6 +28,7 @@
   'use strict';
 
   const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+  const GRADES = ['초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
   const MAX_DAYS = 3660; // 무한 루프 방지 (약 10년)
 
   function parseDate(s) {
@@ -265,6 +267,7 @@
 
   return {
     WEEKDAYS,
+    GRADES,
     addDays,
     weekday,
     today,

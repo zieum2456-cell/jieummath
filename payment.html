@@ -168,6 +168,7 @@
       <form id="student-form" class="row">
         <input type="hidden" id="f-id">
         <label>이름<input id="f-name" required size="8"></label>
+        <label>학년<select id="f-grade"></select></label>
         <label>회당 수업시간<select id="f-min"><option value="60">60분</option><option value="90">90분</option><option value="120" selected>120분</option></select></label>
         <label>결제 기준
           <select id="f-cycle"><option value="12">12회(주3일)</option><option value="8">8회(주2일)</option></select>
@@ -183,7 +184,7 @@
     <div class="card">
       <h2>학생 목록</h2>
       <div class="table-wrap"><table>
-        <thead><tr><th>이름</th><th>요일</th><th>수업시간</th><th>결제 기준</th><th>회차 시작일</th><th>원비</th><th>메모</th><th></th></tr></thead>
+        <thead><tr><th>이름</th><th>학년</th><th>요일</th><th>수업시간</th><th>결제 기준</th><th>회차 시작일</th><th>원비</th><th>메모</th><th></th></tr></thead>
         <tbody id="stu-body"></tbody>
         <tfoot id="stu-foot"></tfoot>
       </table></div>

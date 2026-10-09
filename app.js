@@ -59,6 +59,7 @@
   const calc = (s) => P.computeCycle(s, state.holidays);
   const byName = (a, b) => a.name.localeCompare(b.name, 'ko');
   const byMinutesThenName = (a, b) => Number(a.minutes) - Number(b.minutes) || byName(a, b);
+  const gradeTag = (s) => (s.grade ? `<span class="muted">${esc(s.grade)}</span> ` : '');
   const feeText = (s) => (s.fee != null ? Number(s.fee).toLocaleString('ko-KR') + '원' : '-');
 
   /* ---------- 탭 ---------- */
@@ -101,7 +102,7 @@
       ? rows
           .map(
             ({ s, r, due }) => `<tr class="click" data-id="${s.id}">
-        <td><b>${esc(s.name)}</b></td>
+        <td>${gradeTag(s)}<b>${esc(s.name)}</b></td>
         <td>${daysText(s.days)} · ${P.formatMinutes(s.minutes)} · ${P.cycleLabel(s.cycle)}</td>
         <td>${r.done} / ${r.total}</td>
         <td>${r.lastDate ? P.fmtMDW(r.lastDate) : '-'}</td>
@@ -141,7 +142,7 @@
     const due = P.dueDate(r, state.settings);
     const today = P.today();
 
-    $('d-title').innerHTML = `${esc(s.name)} ${dueBadge(due)}`;
+    $('d-title').innerHTML = `${gradeTag(s)}${esc(s.name)} ${dueBadge(due)}`;
     $('d-summary').innerHTML = [
       `${daysText(s.days)} · ${P.formatMinutes(s.minutes)} · ${P.cycleLabel(s.cycle)} 결제`,
       `수업 시작일 ${P.fmtDot(s.startDate)}`,
@@ -279,10 +280,15 @@
     .map((d) => `<label><input type="checkbox" value="${d}">${P.WEEKDAYS[d]}</label>`)
     .join('');
 
+  $('f-grade').innerHTML = '<option value="">선택</option>' + P.GRADES.map((g) => `<option>${g}</option>`).join('');
+
   function fillForm(s) {
     $('form-title').textContent = s ? `학생 수정: ${s.name}` : '학생 추가';
     $('f-id').value = s ? s.id : '';
     $('f-name').value = s ? s.name : '';
+    const grade = (s && s.grade) || '';
+    if (grade && !P.GRADES.includes(grade) && ![...$('f-grade').options].some((o) => o.value === grade)) $('f-grade').add(new Option(grade, grade));
+    $('f-grade').value = grade;
     const min = String(s ? s.minutes : 120);
     [...$('f-min').options].filter((o) => !['60', '90', '120'].includes(o.value)).forEach((o) => o.remove());
     if (!['60', '90', '120'].includes(min)) $('f-min').add(new Option(`${min}분`, min)); // 예전에 입력한 다른 시간
@@ -302,6 +308,7 @@
     if (Number.isNaN(fee)) return alert('원비는 35만처럼 입력해 주세요.');
     const data = {
       name: $('f-name').value.trim(),
+      grade: $('f-grade').value,
       minutes: Number($('f-min').value),
       cycle: Number($('f-cycle').value),
       days,
@@ -323,7 +330,7 @@
       ? [...state.students]
           .sort(byMinutesThenName)
           .map(
-            (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
+            (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.grade || '-')}</td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
         <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td>${feeText(s)}</td><td class="muted">${esc(s.memo)}</td>
         <td style="white-space:nowrap;text-align:right">
           <button class="btn small" data-open="${s.id}">보기</button>
@@ -331,10 +338,10 @@
           <button class="btn small danger" data-remove="${s.id}">삭제</button></td></tr>`
           )
           .join('')
-      : '<tr><td colspan="8" class="empty">등록된 학생이 없습니다.</td></tr>';
+      : '<tr><td colspan="9" class="empty">등록된 학생이 없습니다.</td></tr>';
     const feeTotal = state.students.reduce((sum, s) => sum + (Number(s.fee) || 0), 0);
     $('stu-foot').innerHTML = state.students.length
-      ? `<tr><td colspan="5">원비 합계</td><td>${feeTotal.toLocaleString('ko-KR')}원</td><td colspan="2"></td></tr>`
+      ? `<tr><td colspan="6">원비 합계</td><td>${feeTotal.toLocaleString('ko-KR')}원</td><td colspan="2"></td></tr>`
       : '';
     const on = (attr, fn) => $('stu-body').querySelectorAll(`[data-${attr}]`).forEach((b) => b.addEventListener('click', () => fn(b.dataset[attr])));
     on('open', (id) => {
