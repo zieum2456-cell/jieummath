@@ -2,20 +2,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const T = require('../timetable.js');
 
-test('칸 구성: 15~20시 30분 단위 10칸 + 20~22시 1시간 단위 2칸', () => {
-  assert.equal(T.SLOTS.length, 12);
-  assert.equal(T.fmtTime(T.SLOTS[0].start), '15:00');
-  assert.equal(T.fmtTime(T.SLOTS[9].start), '19:30');
-  assert.deepEqual(T.SLOTS.slice(10).map((s) => [T.fmtTime(s.start), T.fmtTime(s.end)]), [['20:00', '21:00'], ['21:00', '22:00']]);
+test('칸 구성: 월~금 15~20시 30분 10칸 + 20~22시 1시간 2칸, 토 10~16시 30분 12칸', () => {
+  const wd = T.dayInfo(1).slots;
+  assert.equal(wd.length, 12);
+  assert.equal(T.fmtTime(wd[0].start), '15:00');
+  assert.equal(T.fmtTime(wd[9].start), '19:30');
+  assert.deepEqual(wd.slice(10).map((s) => [T.fmtTime(s.start), T.fmtTime(s.end)]), [['20:00', '21:00'], ['21:00', '22:00']]);
+  const sat = T.dayInfo(6).slots;
+  assert.equal(sat.length, 12);
+  assert.equal(T.fmtTime(sat[0].start), '10:00');
+  assert.equal(T.fmtTime(sat[11].end), '16:00');
+  assert.ok(sat.every((s) => s.end - s.start === 30));
 });
 
 test('시각 → 세로 위치는 구간별로 비례', () => {
-  assert.equal(T.timeToRow(T.parseTime('15:00')), 0);
-  assert.equal(T.timeToRow(T.parseTime('16:15')), 2.5);
-  assert.equal(T.timeToRow(T.parseTime('20:00')), 10);
-  assert.equal(T.timeToRow(T.parseTime('20:30')), 10.5);
-  assert.equal(T.timeToRow(T.parseTime('22:00')), 12);
-  assert.equal(T.timeToRow(T.parseTime('14:00')), 0); // 범위 밖은 끝에 맞춤
+  assert.equal(T.timeToRow(T.parseTime('15:00'), 1), 0);
+  assert.equal(T.timeToRow(T.parseTime('16:15'), 1), 2.5);
+  assert.equal(T.timeToRow(T.parseTime('20:00'), 1), 10);
+  assert.equal(T.timeToRow(T.parseTime('20:30'), 1), 10.5);
+  assert.equal(T.timeToRow(T.parseTime('22:00'), 1), 12);
+  assert.equal(T.timeToRow(T.parseTime('14:00'), 1), 0); // 범위 밖은 끝에 맞춤
+  assert.equal(T.timeToRow(T.parseTime('10:00'), 6), 0);
+  assert.equal(T.timeToRow(T.parseTime('13:00'), 6), 6);
+  assert.equal(T.timeToRow(T.parseTime('16:00'), 6), 12);
 });
 
 test('시각 확인', () => {
@@ -23,6 +32,9 @@ test('시각 확인', () => {
   assert.equal(T.validateTime({ in: '15:00', out: '17:00' }), null);
   assert.ok(T.validateTime({ in: '15:00', out: '' }));
   assert.ok(T.validateTime({ in: '17:00', out: '15:00' }));
+  assert.equal(T.validateTime({ in: '10:00', out: '12:00' }, 6), null);
+  assert.ok(T.validateTime({ in: '15:00', out: '17:00' }, 6)); // 토요일은 16시까지
+  assert.ok(T.validateTime({ in: '10:00', out: '12:00' }, 1)); // 평일은 15시부터
 });
 
 test('요일별 학생 배치: 겹치면 다른 줄, 겹치지 않으면 같은 줄 재사용', () => {
@@ -46,6 +58,10 @@ test('요일별 학생 배치: 겹치면 다른 줄, 겹치지 않으면 같은 
   assert.equal(d.counts[10], 1);
   assert.equal(d.counts[11], 0);
   assert.equal(T.buildDay(students, 3).entries.length, 1);
+  // 토요일 범위(10~16시) 밖 시간은 시간표에서 빠짐
+  const sat = [{ id: 'x', name: '마', times: { 6: { in: '17:00', out: '18:00' } } }, { id: 'y', name: '바', times: { 6: { in: '15:00', out: '17:00' } } }];
+  const d6 = T.buildDay(sat, 6);
+  assert.deepEqual(d6.entries.map((e) => [e.name, e.bottom]), [['바', 12]]);
   assert.equal(T.buildDay(students, 6).entries.length, 0);
 });
 
@@ -58,8 +74,9 @@ test('같은 학생은 모든 요일에서 같은 줄, 같은 요일 같은 줄�
     const len = [60, 90, 120][Math.floor(r() * 3)];
     for (const day of [1, 2, 3, 4, 5, 6]) {
       if (r() < 0.5) continue;
-      const s = r() < 0.6 ? st : 15 * 60 + Math.floor(r() * 8) * 30;
-      times[day] = { in: T.fmtTime(s), out: T.fmtTime(Math.min(s + len, T.END)) };
+      const h = T.dayInfo(day).hours;
+      const s = r() < 0.6 && day !== 6 ? st : h.start + Math.floor(r() * 8) * 30;
+      times[day] = { in: T.fmtTime(s), out: T.fmtTime(Math.min(s + len, h.end)) };
     }
     return { id: 's' + i, name: '학생' + i, times };
   });

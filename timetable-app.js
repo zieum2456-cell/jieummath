@@ -62,15 +62,15 @@
   }
 
   function renderTimetable() {
-    const rows = T.SLOTS.length;
     const lanes = T.assignLanes(state.students);
-    $('timetable').innerHTML = T.DAYS.map(({ day, label }) => {
+    $('timetable').innerHTML = T.DAYS.map(({ day, label, slots }) => {
+      const rows = slots.length;
       const d = T.buildDay(state.students, day, lanes);
-      const times = T.SLOTS.map((slot, i) => {
+      const times = slots.map((slot, i) => {
         const c = d.counts[i];
         return `<div class="${slot.end - slot.start === 60 ? 'hour' : ''}"><span>${T.fmtTime(slot.start)}</span><span class="cnt${c ? '' : ' zero'}">${c}명</span></div>`;
       }).join('');
-      const grid = T.SLOTS.map((slot) => {
+      const grid = slots.map((slot) => {
         const cls = ['grid'];
         if (slot.end % 60 === 0) cls.push('on-hour');
         if (slot.end - slot.start === 60) cls.push('hour');
@@ -109,6 +109,15 @@
     return `${t.in}~${t.out}`;
   }
 
+  // 시간표 범위 밖 시간은 빨간색으로 (시간표에 안 나옴)
+  function timeCell(s, day) {
+    const text = timeText(s, day);
+    if (!text) return '<td class="t"><span class="muted">-</span></td>';
+    if (T.inHours(s.times[day], day)) return `<td class="t">${esc(text)}</td>`;
+    const h = T.dayInfo(day).hours;
+    return `<td class="t out" title="시간표 범위(${T.fmtTime(h.start)}~${T.fmtTime(h.end)}) 밖이라 시간표에 표시되지 않습니다. 수정해 주세요.">${esc(text)} ⚠</td>`;
+  }
+
   function renderList() {
     const list = [...state.students].sort(byName);
     $('stu-count').textContent = `(${list.length}명)`;
@@ -117,7 +126,7 @@
       return;
     }
     $('stu-table').innerHTML = `<thead><tr><th>이름</th>${T.DAYS.map((d) => `<th>${d.label}</th>`).join('')}<th></th></tr></thead><tbody>`
-      + list.map((s) => `<tr><td><b>${esc(s.name)}</b></td>${T.DAYS.map((d) => `<td class="t">${esc(timeText(s, d.day)) || '<span class="muted">-</span>'}</td>`).join('')}`
+      + list.map((s) => `<tr><td><b>${esc(s.name)}</b></td>${T.DAYS.map((d) => timeCell(s, d.day)).join('')}`
         + `<td><button class="btn small" data-edit="${esc(s.id)}">수정</button></td></tr>`).join('')
       + '</tbody>';
   }
@@ -130,17 +139,18 @@
   });
 
   /* ---------- 입력 폼 ---------- */
-  const TIME_OPTIONS = (() => {
+  function timeOptions(day) {
+    const h = T.dayInfo(day).hours;
     const out = ['<option value="">--:--</option>'];
-    for (let t = T.START; t <= T.END; t += 10) out.push(`<option>${T.fmtTime(t)}</option>`);
+    for (let t = h.start; t <= h.end; t += 10) out.push(`<option>${T.fmtTime(t)}</option>`);
     return out.join('');
-  })();
+  }
 
   $('f-days').innerHTML = T.DAYS.map(({ day, label }) => `<div class="day-row">
       <b>${label}</b>
-      <select data-in="${day}" aria-label="${label}요일 등원">${TIME_OPTIONS}</select>
+      <select data-in="${day}" aria-label="${label}요일 등원">${timeOptions(day)}</select>
       <span>~</span>
-      <select data-out="${day}" aria-label="${label}요일 하원">${TIME_OPTIONS}</select>
+      <select data-out="${day}" aria-label="${label}요일 하원">${timeOptions(day)}</select>
       <button class="btn small" type="button" data-clear="${day}">지우기</button>
     </div>`).join('');
 
@@ -160,7 +170,7 @@
     const out = outSel(day);
     const b = T.parseTime(out.value);
     if (a != null && (b == null || b <= a)) {
-      setSelect(out, T.fmtTime(Math.min(a + Number($('f-length').value), T.END)));
+      setSelect(out, T.fmtTime(Math.min(a + Number($('f-length').value), T.dayInfo(day).hours.end)));
     }
   });
 
@@ -209,7 +219,7 @@
     const times = {};
     for (const { day, label } of T.DAYS) {
       const t = { in: inSel(day).value, out: outSel(day).value };
-      const err = T.validateTime(t);
+      const err = T.validateTime(t, day);
       if (err) {
         $('f-err').textContent = `${label}요일: ${err}`;
         return;
