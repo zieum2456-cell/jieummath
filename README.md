@@ -88,6 +88,8 @@
 npm test   # 결제일·시간표 계산, 온라인 저장 판단 로직 테스트 (Node 18 이상)
 ```
 
+JS 파일을 고치면 `payment.html`·`timetable.html`의 `<script src="...js?v=날짜">` 값도 바꿔 주세요. 브라우저가 예전 JS를 캐시해 두고 쓰는 것을 막습니다.
+
 - `payment.js` — 결제일 계산과 메시지 생성 로직
 - `app.js` — 화면 처리
 - `payment.html` — 화면 구성
