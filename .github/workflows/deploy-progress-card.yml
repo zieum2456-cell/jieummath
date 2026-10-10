@@ -1,0 +1,57 @@
+# 진도 카드(progress-card) 코드를 Google Apps Script에 자동으로 올리고 웹 앱을 새 버전으로 배포한다.
+# 필요한 설정 (GitHub 저장소 Settings → Secrets and variables → Actions):
+#   - Secret   CLASPRC_JSON  : clasp 로그인 정보 (~/.clasprc.json 내용)
+#   - Variable SCRIPT_ID     : Apps Script 스크립트 ID
+#   - Variable DEPLOYMENT_ID : 웹 앱 배포 ID (없으면 코드만 올리고 배포는 건너뜀)
+# 설정 방법은 progress-card/설치안내.md "12. 자동 배포 설정" 참고.
+name: 진도 카드 Apps Script 배포
+
+on:
+  push:
+    branches: [claude/student-payment-notification-j7g4us]
+    paths:
+      - 'progress-card/**'
+      - '.github/workflows/deploy-progress-card.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-progress-card
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      SCRIPT_ID: ${{ vars.SCRIPT_ID }}
+      DEPLOYMENT_ID: ${{ vars.DEPLOYMENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 테스트
+        run: npm test
+      - name: 설정 확인
+        id: cfg
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$SCRIPT_ID" ]; then
+            echo "::warning::CLASPRC_JSON(비밀값) 또는 SCRIPT_ID(변수)가 없어 Apps Script 배포를 건너뜁니다. progress-card/설치안내.md '12. 자동 배포 설정'을 참고하세요."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Apps Script에 코드 올리기
+        if: steps.cfg.outputs.ready == 'true'
+        working-directory: progress-card
+        run: |
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > .clasp.json
+          npx -y @google/clasp@2.4.2 push --force
+      - name: 웹 앱 새 버전으로 배포 (주소 유지)
+        if: steps.cfg.outputs.ready == 'true' && env.DEPLOYMENT_ID != ''
+        working-directory: progress-card
+        run: npx -y @google/clasp@2.4.2 deploy --deploymentId "$DEPLOYMENT_ID" --description "${GITHUB_SHA::7} $(date -u +%F)"
+      - name: 로그인 정보 지우기
+        if: always()
+        run: rm -f ~/.clasprc.json
