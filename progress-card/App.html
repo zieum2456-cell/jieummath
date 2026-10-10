@@ -1,0 +1,845 @@
+<script>
+/* 화면 동작. 검사 로직은 Core.html, 저장은 Code.gs */
+(function () {
+  'use strict';
+  const C = window.Core;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const wide = () => window.matchMedia('(min-width: 768px)').matches;
+
+  function run(fn, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((e) => reject(new Error((e && e.message) || String(e))))[fn](...args);
+    });
+  }
+
+  const S = {
+    tab: 'upload',
+    roster: [],
+    settings: {},
+    doneOptions: [],
+    links: {},
+    uploads: [], // 확인 대기 중인 업로드
+    cards: [], // 확인 대기 중인 카드
+    existing: {}, // 기록ID → 저장된 기록 요약(없으면 null)
+    selected: null,
+    uploadLog: [],
+    result: null,
+    rosterDiff: null,
+  };
+
+  /* ---------- 공통 ---------- */
+  let loadingCount = 0;
+  function busy(text) {
+    loadingCount++;
+    $('loading-text').textContent = text || '';
+    $('loading').classList.remove('hidden');
+  }
+  function idle() {
+    loadingCount = Math.max(0, loadingCount - 1);
+    if (!loadingCount) $('loading').classList.add('hidden');
+  }
+  let toastTimer = null;
+  function toast(msg) {
+    $('toast').textContent = msg;
+    $('toast').classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 3500);
+  }
+  function setTopHeight() {
+    document.documentElement.style.setProperty('--top-h', document.querySelector('header.top').offsetHeight + 'px');
+  }
+  window.addEventListener('resize', () => {
+    setTopHeight();
+    if (S.tab === 'review') renderReview();
+  });
+
+  function show(tab) {
+    S.tab = tab;
+    ['upload', 'review', 'roster', 'settings'].forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== tab));
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    $('savebar').classList.toggle('hidden', tab !== 'review' || !S.cards.length);
+    if (tab === 'review') renderReview();
+    if (tab === 'roster') renderRoster();
+    if (tab === 'settings') renderSettings();
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+
+  /* ---------- 임시 저장 (이 기기에서 고치던 내용) ---------- */
+  const draftKey = (c) => 'pc-draft:' + c.id;
+  function saveDraft(c) {
+    try {
+      localStorage.setItem(draftKey(c), JSON.stringify({ values: c.values, include: c.include, dupChoice: c.dupChoice, cellsOk: c.cellsOk }));
+    } catch (e) { /* 저장 공간을 못 쓰면 임시 저장만 건너뜀 */ }
+  }
+  function loadDraft(c) {
+    try {
+      const d = JSON.parse(localStorage.getItem(draftKey(c)) || 'null');
+      if (!d) return;
+      Object.assign(c.values, d.values || {});
+      c.include = d.include !== false;
+      c.dupChoice = d.dupChoice || 'skip';
+      c.cellsOk = !!d.cellsOk;
+    } catch (e) { /* 무시 */ }
+  }
+  function clearDraft(c) {
+    try {
+      localStorage.removeItem(draftKey(c));
+    } catch (e) { /* 무시 */ }
+  }
+
+  /* ---------- 업로드 ---------- */
+  function readBuffer(file) {
+    if (file.arrayBuffer) return file.arrayBuffer();
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+      r.readAsArrayBuffer(file);
+    });
+  }
+  function toB64(buf) {
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
+  async function handleFile(file) {
+    const name = C.nfc(file.name);
+    const entry = { fileName: name, ok: false, errors: [], note: '', summary: '' };
+    let buf;
+    try {
+      buf = await readBuffer(file);
+    } catch (e) {
+      entry.errors.push('파일을 읽지 못했습니다. ' + e.message);
+      return entry;
+    }
+    let text;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+    } catch (e) {
+      entry.errors.push('UTF-8 형식의 CSV가 아닙니다. Claude가 만들어 준 CSV 파일을 그대로 올려 주세요. (엑셀 등에서 다시 저장하면 형식이 바뀔 수 있습니다)');
+      return entry;
+    }
+    const parsed = C.readCsv(name, text);
+    if (parsed.headerErrors.length) {
+      entry.errors = parsed.headerErrors;
+      entry.rejected = true;
+      return entry;
+    }
+    const cards = parsed.cards;
+    const reviewCount = cards.filter((c) => c.values.확인필요).length;
+    const errCount = cards.filter((c) => C.validateCard(c.values, { cellCount: c.cellCount, fileDate: parsed.fileDate }).some((x) => x.level === 'error')).length;
+    entry.summary = `카드 ${cards.length}장 · 확인필요 ${reviewCount}장 · 형식 오류 ${errCount}장`;
+    try {
+      const res = await run('api_registerUpload', {
+        fileName: name,
+        b64: toB64(buf),
+        classDate: parsed.fileDate || cards[0].values.수업일,
+        cardCount: cards.length,
+        reviewCount,
+      });
+      entry.ok = true;
+      entry.fileUrl = res.fileUrl;
+      if (res.duplicate === 'pending') entry.note = '같은 파일이 이미 확인 대기 중이라 새로 올리지 않았습니다.';
+      else if (res.duplicate === 'saved') entry.note = `드라이브에 보관했습니다(${res.storedName}). 같은 내용의 파일을 이미 저장한 적이 있어 확인 화면에서 중복 기록으로 표시됩니다.`;
+      else entry.note = `드라이브에 보관했습니다(${res.storedName}).`;
+    } catch (e) {
+      entry.errors.push('드라이브 보관·확인 대기 등록에 실패해서 이 파일은 확인 화면에 올라가지 않았습니다. 다시 올려 주세요. (' + e.message + ')');
+    }
+    return entry;
+  }
+
+  $('file-input').addEventListener('change', async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if (!files.length) return;
+    busy(`파일 ${files.length}개 검사·보관 중…`);
+    try {
+      const entries = [];
+      for (const f of files) entries.push(await handleFile(f));
+      S.uploadLog = entries.concat(S.uploadLog);
+      renderUploadLog();
+      if (entries.some((x) => x.ok)) await loadPending();
+    } catch (err) {
+      toast('오류: ' + err.message);
+    } finally {
+      idle();
+    }
+  });
+
+  function renderUploadLog() {
+    const waiting = S.cards.length;
+    $('upload-log').innerHTML = S.uploadLog.map((x) => {
+      if (x.ok) {
+        return `<div class="notice ok"><b>✓ ${esc(x.fileName)}</b> — ${esc(x.summary)}<br>
+          <span class="muted">${esc(x.note)}</span></div>`;
+      }
+      return `<div class="notice err"><b>✗ ${esc(x.fileName)}</b> — ${x.rejected ? '형식이 맞지 않아 받지 않았습니다.' : '올리지 못했습니다.'}
+        <ul>${x.errors.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></div>`;
+    }).join('') + (waiting ? `<button class="btn primary" id="go-review">확인 화면으로 (대기 ${waiting}장) →</button>` : '');
+    const go = $('go-review');
+    if (go) go.addEventListener('click', () => show('review'));
+  }
+
+  /* ---------- 확인 대기 불러오기 ---------- */
+  async function loadPending() {
+    const list = await run('api_pending');
+    const keep = new Map(S.cards.map((c) => [c.id, c]));
+    const uploads = [];
+    const cards = [];
+    list.forEach((u) => {
+      const up = { uploadId: u.uploadId, fileName: u.fileName, classDate: u.classDate, uploadedAt: u.uploadedAt, fileUrl: u.fileUrl, status: u.status, error: u.error };
+      uploads.push(up);
+      if (u.error) return;
+      const parsed = C.readCsv(u.fileName, u.text);
+      if (parsed.headerErrors.length) {
+        up.error = parsed.headerErrors.join(' ');
+        return;
+      }
+      parsed.cards.forEach((pc) => {
+        if (u.handledRows.indexOf(pc.rowNo) >= 0) return;
+        const id = `${u.uploadId}:${pc.rowNo}`;
+        if (keep.has(id)) return cards.push(keep.get(id));
+        const card = {
+          id, uploadId: u.uploadId, fileName: u.fileName, fileDate: parsed.fileDate, rowNo: pc.rowNo, cellCount: pc.cellCount,
+          values: { ...pc.values }, original: { ...pc.values }, include: true, dupChoice: 'skip', cellsOk: false, saveError: '',
+        };
+        loadDraft(card);
+        cards.push(card);
+      });
+    });
+    S.uploads = uploads;
+    S.cards = cards;
+    await lookup(cards.map((c) => C.cardKey(c.values)));
+    // 저장은 됐는데 업로드이력 갱신만 실패했던 카드는 숨긴다
+    S.cards = S.cards.filter((c) => {
+      const ex = S.existing[C.cardKey(c.values)];
+      return !(ex && ex.업로드ID === c.uploadId);
+    });
+    revalidate();
+    // 확인 화면 순서는 처음 불러올 때 정한다 (고치는 동안 카드가 움직이지 않게)
+    S.cards.forEach((c) => {
+      if (c.order == null) c.order = c.rank;
+    });
+    S.cards.sort((a, b) => a.order - b.order || a.values.수업일.localeCompare(b.values.수업일) || a.values.학생번호.localeCompare(b.values.학생번호) || a.rowNo - b.rowNo);
+    if (!S.cards.some((c) => c.id === S.selected)) S.selected = null;
+    updateCount();
+    renderUploadLog();
+    if (S.tab === 'review') renderReview();
+  }
+
+  /** 아직 조회하지 않은 기록ID들의 저장 여부를 서버에서 확인 */
+  async function lookup(keys) {
+    const want = [...new Set(keys)].filter((k) => /^\d{4}-\d{2}-\d{2}_\d{2}$/.test(k) && !(k in S.existing));
+    if (!want.length) return;
+    const found = await run('api_lookup', want);
+    want.forEach((k) => (S.existing[k] = found[k] || null));
+  }
+
+  /* ---------- 카드 검사 ---------- */
+  function revalidate() {
+    const counts = {};
+    S.cards.forEach((c) => {
+      if (!c.include) return;
+      const k = C.cardKey(c.values);
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    S.cards.forEach((c) => {
+      const key = C.cardKey(c.values);
+      c.existing = S.existing[key] || null;
+      c.issues = C.validateCard(c.values, {
+        roster: S.roster,
+        existing: c.existing,
+        batchCount: c.include ? counts[key] : 1,
+        fileDate: c.fileDate,
+        cellCount: c.cellCount,
+        cellsOk: c.cellsOk,
+      });
+      c.hasError = c.issues.some((x) => x.level === 'error');
+      c.rank = C.rankOf(c.values, c.issues);
+    });
+  }
+
+  /** 저장 버튼을 눌렀을 때 이 카드가 어떻게 되는지 */
+  function fate(c) {
+    if (!c.include) return 'exclude';
+    const key = C.cardKey(c.values);
+    if (c.existing && c.dupChoice === 'skip') return 'skip';
+    if (c.hasError) return 'blocked';
+    if (!(key in S.existing)) return 'wait';
+    return c.existing ? 'overwrite' : 'save';
+  }
+
+  function updateCount() {
+    const n = S.cards.length;
+    $('review-count').textContent = n;
+    $('review-count').classList.toggle('hidden', !n);
+  }
+
+  /* ---------- 확인 화면 ---------- */
+  const GROUPS = ['확인필요', '오류', '경고', '문제없음'];
+
+  function renderReview() {
+    renderResult();
+    renderFiles();
+    const reviewEl = $('review');
+    if (!S.cards.length) {
+      reviewEl.classList.remove('show-detail');
+      $('card-list').innerHTML = `<div class="empty">확인할 카드가 없습니다.<br>업로드 탭에서 CSV 파일을 올려 주세요.</div>`;
+      $('card-detail').innerHTML = '';
+      $('savebar').classList.add('hidden');
+      return;
+    }
+    if (!S.selected && wide()) S.selected = S.cards[0].id;
+    reviewEl.classList.toggle('show-detail', !!S.selected);
+    renderList();
+    renderDetail();
+    renderSavebar();
+  }
+
+  function renderResult() {
+    const r = S.result;
+    if (!r) return ($('save-result').innerHTML = '');
+    if (r.fatal) {
+      $('save-result').innerHTML = `<div class="notice err"><b>저장하지 못했습니다.</b> 아무 카드도 저장되지 않았습니다. 잠시 후 다시 저장해 주세요.<br><span class="muted">${esc(r.fatal)}</span></div>`;
+      return;
+    }
+    const cnt = (s) => r.cards.filter((x) => x.status === s).length;
+    const failed = r.cards.filter((x) => x.status === 'failed');
+    const logFail = r.logs.filter((x) => !x.ok);
+    const name = (id) => (S.uploadNames[id] || id);
+    const parts = [`저장 ${cnt('saved')}장`];
+    if (cnt('overwritten')) parts.push(`덮어쓰기 ${cnt('overwritten')}장`);
+    if (r.skips.length) parts.push(`건너뜀 ${r.skips.length}장`);
+    let html = `<div class="notice ${failed.length || logFail.length ? 'warn' : 'ok'}"><b>저장 결과 (${esc(r.time)})</b> ${parts.join(' · ')}`;
+    if (r.blocked) html += `<br>오류가 있어 저장하지 않은 카드 ${r.blocked}장은 아래에 남아 있습니다.`;
+    if (failed.length) {
+      html += `<br><b>저장되지 않은 카드 ${failed.length}장</b> (아래 목록에 남아 있으니 다시 저장할 수 있습니다)<ul>`
+        + failed.map((x) => `<li>${esc(x.label)} — ${esc(x.error)}</li>`).join('') + '</ul>';
+    }
+    if (logFail.length) {
+      html += `<br><b>업로드이력 기록 실패</b> (카드는 저장됐지만 이력 탭이 갱신되지 않았습니다)<ul>`
+        + logFail.map((x) => `<li>${esc(name(x.uploadId))} — ${esc(x.error)}</li>`).join('') + '</ul>';
+    }
+    html += ' <button class="btn small" id="result-close">닫기</button></div>';
+    $('save-result').innerHTML = html;
+    $('result-close').addEventListener('click', () => {
+      S.result = null;
+      renderResult();
+    });
+  }
+
+  function renderFiles() {
+    if (!S.uploads.length) return ($('review-files').innerHTML = '');
+    const rows = S.uploads.map((u) => {
+      const n = S.cards.filter((c) => c.uploadId === u.uploadId).length;
+      return `<div class="file-row"><div><b>${esc(u.fileName)}</b> <span class="muted">${esc(u.uploadedAt)} 업로드 · 남은 카드 ${n}장</span>
+        ${u.error ? `<div class="muted" style="color:var(--danger)">${esc(u.error)}</div>` : ''}</div>
+        <div class="row"><a class="btn small" href="${esc(u.fileUrl)}" target="_blank">원본</a>
+        <button class="btn small danger" data-cancel="${esc(u.uploadId)}">대기에서 빼기</button></div></div>`;
+    }).join('');
+    $('review-files').innerHTML = `<details class="card"${S.uploads.some((u) => u.error) ? ' open' : ''}><summary><b>확인 대기 파일 ${S.uploads.length}개</b></summary>${rows}</details>`;
+    $('review-files').querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', async () => {
+      const u = S.uploads.find((x) => x.uploadId === b.dataset.cancel);
+      if (!confirm(`${u.fileName}을(를) 확인 대기에서 뺄까요?\n아직 저장하지 않은 카드는 저장되지 않습니다. 원본 파일은 드라이브에 그대로 남습니다.`)) return;
+      busy('처리 중…');
+      try {
+        await run('api_cancelUpload', u.uploadId);
+        S.cards.filter((c) => c.uploadId === u.uploadId).forEach(clearDraft);
+        await loadPending();
+      } catch (e) {
+        toast('실패: ' + e.message);
+      } finally {
+        idle();
+      }
+    }));
+  }
+
+  function cardBadges(c) {
+    const b = [];
+    const review = C.splitList(c.values.확인필요).length;
+    if (review) b.push(`<span class="badge review">확인필요 ${review}</span>`);
+    const e = c.issues.filter((x) => x.level === 'error').length;
+    const w = c.issues.filter((x) => x.level === 'warn' && x.field !== '_dup').length;
+    if (e) b.push(`<span class="badge err">오류 ${e}</span>`);
+    if (w) b.push(`<span class="badge warn">경고 ${w}</span>`);
+    const f = fate(c);
+    if (c.existing) b.push(`<span class="badge warn">이미 있음 · ${c.dupChoice === 'skip' ? '건너뛰기' : '덮어쓰기'}</span>`);
+    if (f === 'exclude') b.push('<span class="badge off">저장 안 함</span>');
+    if (!b.length) b.push('<span class="badge ok">문제없음</span>');
+    if (c.saveError) b.push('<span class="badge err">저장 실패</span>');
+    return b.join('');
+  }
+
+  function renderList() {
+    let lastGroup = null;
+    $('card-list').innerHTML = S.cards.map((c) => {
+      const v = c.values;
+      let head = '';
+      if (c.order !== lastGroup) {
+        lastGroup = c.order;
+        head = `<div class="group">${GROUPS[c.order]}</div>`;
+      }
+      const sub = [v.수업일, v.출결, C.splitList(v.단계).join('·'), v.진행률].filter(Boolean).join(' · ');
+      return `${head}<button class="item r${c.rank} ${c.id === S.selected ? 'sel' : ''} ${c.include ? '' : 'off'}" data-id="${esc(c.id)}">
+        <div class="item-top"><b>${esc(v.학생번호)} ${esc(v.이름)}</b><span class="muted">${c.rowNo}행</span></div>
+        <div class="item-sub">${esc(sub)}</div><div class="badges">${cardBadges(c)}</div></button>`;
+    }).join('');
+  }
+  $('card-list').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-id]');
+    if (!b) return;
+    S.selected = b.dataset.id;
+    $('review').classList.add('show-detail');
+    renderList();
+    renderDetail();
+    if (!wide()) window.scrollTo(0, 0);
+  });
+
+  /* 칸 종류 */
+  const FIELDS = [
+    { f: '수업일', type: 'text', mode: 'numeric', ph: '2026-10-09' },
+    { f: '학생번호', type: 'text', mode: 'numeric', ph: '56' },
+    { f: '이름', type: 'text' },
+    { f: '출결', type: 'seg' },
+    { f: '시간', type: 'time' },
+    { f: '지난과제', type: 'seg' },
+    { f: '단계', type: 'multi' },
+    { f: '진행률', type: 'seg' },
+    { f: '오답원인', type: 'multi' },
+    { f: '추가포인트', type: 'seg' },
+    { f: '지난과제범위', type: 'range' },
+    { f: '오늘진도범위', type: 'range' },
+    { f: '추가포인트범위', type: 'range' },
+    { f: '오늘과제', type: 'range' },
+    { f: '학습태도', type: 'area', wide: true },
+  ];
+  const TIME_FIELDS = ['등원', '하원', '수업시간(분)'];
+
+  function rangePreview(text) {
+    const items = C.parseRangeList(text);
+    if (!items.length) return '<span class="muted">(없음)</span>';
+    return items.map((x) => {
+      if (!x.ok) return `<span class="chip raw" title="형식이 맞지 않아 원문 보존">원문: ${esc(x.raw)}</span>`;
+      const cls = x.mark === '○' ? 'done' : x.mark === '△' ? 'partial' : '';
+      return `<span class="chip ${cls}">${esc(x.book)}${x.unit ? `(${esc(x.unit)})` : ''} ${esc(x.range || '-')}<span class="m">${x.mark ? esc(x.mark) + ' ' : ''}${C.MARKS[x.mark]}</span></span>`;
+    }).join('');
+  }
+
+  function control(def, v) {
+    const f = def.f;
+    if (def.type === 'text') {
+      return `<input data-input="${f}" value="${esc(v[f])}" ${def.mode ? `inputmode="${def.mode}"` : ''} placeholder="${esc(def.ph || '')}" autocomplete="off" autocapitalize="off">`;
+    }
+    if (def.type === 'seg') {
+      const opts = C.ENUMS[f];
+      let html = opts.map((o) => `<button type="button" data-seg="${f}" data-val="${esc(o)}" class="${v[f] === o ? 'on' : ''}">${esc(o)}</button>`).join('');
+      if (v[f] && opts.indexOf(v[f]) < 0) html += `<button type="button" class="bad" disabled>${esc(v[f])}</button>`;
+      if (v[f] && v.출결 === '결강') html += `<button type="button" data-seg="${f}" data-val="">비우기</button>`;
+      return `<div class="seg">${html}</div>`;
+    }
+    if (def.type === 'multi') {
+      const tokens = C.splitList(v[f]);
+      const opts = C.ENUMS[f];
+      let html = opts.map((o) => `<button type="button" data-multi="${f}" data-val="${esc(o)}" class="${tokens.indexOf(o) >= 0 ? 'on' : ''}">${esc(o)}</button>`).join('');
+      html += tokens.filter((t) => opts.indexOf(t) < 0).map((t) => `<button type="button" class="bad" data-multi="${f}" data-val="${esc(t)}" title="눌러서 빼기">${esc(t)} ✕</button>`).join('');
+      return `<div class="seg">${html}</div>`;
+    }
+    if (def.type === 'time') {
+      return `<div class="time3">${TIME_FIELDS.map((t) => `<label>${t === '수업시간(분)' ? '수업시간(분)' : t}
+        <input data-input="${t}" value="${esc(v[t])}" inputmode="numeric" placeholder="${t === '수업시간(분)' ? '55' : '16:55'}" autocomplete="off"></label>`).join('')}</div>
+        <div class="fhint" data-hint="시간"></div>`;
+    }
+    if (def.type === 'range') {
+      return `<textarea data-input="${f}" rows="2" autocomplete="off" autocapitalize="off">${esc(v[f])}</textarea>
+        <div class="chips" data-preview="${f}">${rangePreview(v[f])}</div>`;
+    }
+    return `<textarea data-input="${f}" rows="3">${esc(v[f])}</textarea>`;
+  }
+
+  function renderDetail() {
+    const c = S.cards.find((x) => x.id === S.selected);
+    if (!c) return ($('card-detail').innerHTML = wide() ? '<div class="empty">왼쪽에서 카드를 고르세요.</div>' : '');
+    const v = c.values;
+    const idx = S.cards.indexOf(c);
+    const notes = C.splitList(v.확인필요);
+    const ex = c.existing;
+    const rosterHit = S.roster.find((r) => r.no === v.학생번호);
+    let html = `<div class="detail-head">
+      <div><button class="btn small only-narrow" data-act="back" style="margin-bottom:8px">← 목록</button>
+        <h2>${esc(v.학생번호)} ${esc(v.이름)}${rosterHit ? ` <span class="muted">(${esc(rosterHit.name)}${rosterHit.grade ? ' · ' + esc(rosterHit.grade) : ''})</span>` : ''}
+        <small>${esc(c.fileName)} · ${c.rowNo}행</small></h2></div>
+      <label class="switch"><input type="checkbox" data-act="include" ${c.include ? 'checked' : ''}> 저장에 포함</label></div>`;
+    if (c.saveError) html += `<div class="issue-box err"><b>지난 저장 실패:</b> ${esc(c.saveError)}</div>`;
+    if (notes.length) {
+      html += `<div class="review-box"><b>⚠ 확인필요 (판독이 불확실한 부분)</b><ul>${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>
+        <div class="muted">해당 칸을 확인·수정하고 저장하면 "해결"로 기록됩니다.</div></div>`;
+    }
+    html += '<div id="card-issues"></div>';
+    if (ex) {
+      html += `<div class="dup-box"><b>이미 저장된 기록이 있습니다</b> <span class="muted">(${esc(ex.저장일시)} 저장${ex.수정일시 ? ', ' + esc(ex.수정일시) + ' 수정' : ''})</span>
+        <dl><dt>출결</dt><dd>${esc(ex.출결)} ${esc(ex.등원)}~${esc(ex.하원)}</dd><dt>단계</dt><dd>${esc(ex.단계)} · ${esc(ex.진행률)}</dd>
+        <dt>오늘진도</dt><dd>${esc(ex.오늘진도범위)}</dd><dt>오늘과제</dt><dd>${esc(ex.오늘과제)}</dd><dt>학습태도</dt><dd>${esc(ex.학습태도)}</dd></dl>
+        <div class="seg"><button type="button" data-act="dup" data-val="skip" class="${c.dupChoice === 'skip' ? 'on' : ''}">건너뛰기 (기존 기록 유지)</button>
+        <button type="button" data-act="dup" data-val="overwrite" class="${c.dupChoice === 'overwrite' ? 'on' : ''}">덮어쓰기</button></div></div>`;
+    }
+    html += `<div class="fields">${FIELDS.map((d) => `<div class="fld ${d.wide || d.type === 'range' || d.type === 'multi' ? 'wide' : ''}" data-field="${d.f}">
+        <div class="flabel">${d.f === '시간' ? '등원 · 하원 · 수업시간' : d.f}<span class="edited">· 수정됨</span>
+        <button type="button" class="revert" data-revert="${d.f}">원래 값</button></div>
+        ${control(d, v)}<div class="fmsg"></div></div>`).join('')}</div>`;
+    html += `<div class="card-nav"><button class="btn" data-act="prev" ${idx <= 0 ? 'disabled' : ''}>← 이전 카드</button>
+      <button class="btn" data-act="next" ${idx >= S.cards.length - 1 ? 'disabled' : ''}>다음 카드 →</button></div>`;
+    $('card-detail').innerHTML = html;
+    updateFieldStates(c);
+  }
+
+  /** 칸별 오류·경고 표시만 다시 그린다 (입력 중 포커스를 잃지 않게) */
+  function updateFieldStates(c) {
+    const root = $('card-detail');
+    const fieldOf = (f) => (TIME_FIELDS.indexOf(f) >= 0 ? '시간' : f);
+    root.querySelectorAll('.fld').forEach((el) => {
+      const f = el.dataset.field;
+      const mine = c.issues.filter((x) => fieldOf(x.field) === f);
+      el.classList.toggle('err', mine.some((x) => x.level === 'error'));
+      el.classList.toggle('warn', !mine.some((x) => x.level === 'error') && mine.length > 0);
+      el.querySelector('.fmsg').innerHTML = mine.map((x) => esc((f === '시간' ? x.field + ': ' : '') + x.msg)).join('<br>');
+      const names = f === '시간' ? TIME_FIELDS : [f];
+      el.classList.toggle('changed', names.some((n) => (c.values[n] || '') !== (c.original[n] || '')));
+    });
+    const hint = root.querySelector('[data-hint="시간"]');
+    if (hint) {
+      const a = C.timeToMin(c.values.등원);
+      const b = C.timeToMin(c.values.하원);
+      hint.textContent = a != null && b != null && b > a ? `등원·하원 차이: ${b - a}분` : '';
+    }
+    // 카드 전체 문제 (칸 수, 같은 업로드 안 중복, 명단)
+    const general = c.issues.filter((x) => x.field && x.field[0] === '_' && x.field !== '_dup');
+    const rosterIssue = c.issues.find((x) => (x.field === '학생번호' || x.field === '이름') && /명단/.test(x.msg));
+    let box = '';
+    if (general.length) {
+      box += `<div class="issue-box err"><ul>${general.map((x) => `<li>${esc(x.msg)}</li>`).join('')}</ul>
+        ${general.some((x) => x.field === '_cells') ? '<button class="btn small" data-act="cellsok" style="margin-top:6px">칸 위치 확인함</button>' : ''}</div>`;
+    }
+    if (rosterIssue && !S.roster.some((r) => r.no === c.values.학생번호) && /^\d{2}$/.test(c.values.학생번호)) {
+      box += `<div class="issue-box warn">${esc(rosterIssue.msg)}
+        <div class="row" style="margin-top:6px"><button class="btn small" data-act="add-roster">${esc(c.values.학생번호)}번 ${esc(c.values.이름)}을(를) 명단에 추가</button>
+        <span class="muted">결제일 관리 앱에 번호를 넣고 [명단 → 불러오기]를 하는 게 더 좋습니다.</span></div></div>`;
+    }
+    const issuesEl = $('card-issues');
+    if (issuesEl) issuesEl.innerHTML = box;
+  }
+
+  function onCardChange(c, { full } = {}) {
+    c.saveError = '';
+    saveDraft(c);
+    revalidate();
+    if (full) renderDetail();
+    else updateFieldStates(c);
+    renderList();
+    renderSavebar();
+  }
+
+  const current = () => S.cards.find((x) => x.id === S.selected);
+
+  $('card-detail').addEventListener('input', (e) => {
+    const el = e.target.closest('[data-input]');
+    const c = current();
+    if (!el || !c) return;
+    const f = el.dataset.input;
+    c.values[f] = el.value;
+    const pv = $('card-detail').querySelector(`[data-preview="${f}"]`);
+    if (pv) pv.innerHTML = rangePreview(el.value);
+    onCardChange(c);
+    if (f === '수업일' || f === '학생번호') {
+      clearTimeout(lookupTimer);
+      lookupTimer = setTimeout(() => refreshLookup(c), 500);
+    }
+  });
+
+  // 날짜·번호를 바꾸면 같은 학생·날짜 기록이 있는지 다시 확인
+  let lookupTimer = null;
+  async function refreshLookup(c) {
+    const had = !!c.existing;
+    try {
+      await lookup([C.cardKey(c.values)]);
+    } catch (err) {
+      toast('기존 기록 확인 실패: ' + err.message);
+      return;
+    }
+    revalidate();
+    // 중복 안내 상자가 생기거나 없어질 때만 전체를 다시 그린다 (입력 중 포커스 유지)
+    onCardChange(c, { full: had !== !!c.existing && c.id === S.selected });
+  }
+
+  $('card-detail').addEventListener('click', async (e) => {
+    const c = current();
+    if (!c) return;
+    const t = e.target.closest('[data-seg],[data-multi],[data-act],[data-revert]');
+    if (!t) return;
+    if (t.dataset.seg) {
+      c.values[t.dataset.seg] = t.dataset.val;
+      return onCardChange(c, { full: true });
+    }
+    if (t.dataset.multi) {
+      const f = t.dataset.multi;
+      const tokens = C.splitList(c.values[f]);
+      const i = tokens.indexOf(t.dataset.val);
+      if (i >= 0) tokens.splice(i, 1);
+      else tokens.push(t.dataset.val);
+      // 목록 순서대로 정렬 (목록에 없는 값은 뒤에)
+      const order = (x) => (C.ENUMS[f].indexOf(x) < 0 ? 99 : C.ENUMS[f].indexOf(x));
+      c.values[f] = tokens.sort((a, b) => order(a) - order(b)).join('; ');
+      return onCardChange(c, { full: true });
+    }
+    if (t.dataset.revert) {
+      const names = t.dataset.revert === '시간' ? TIME_FIELDS : [t.dataset.revert];
+      names.forEach((n) => (c.values[n] = c.original[n]));
+      if (names.some((n) => n === '수업일' || n === '학생번호')) await lookup([C.cardKey(c.values)]).catch(() => {});
+      return onCardChange(c, { full: true });
+    }
+    const act = t.dataset.act;
+    if (act === 'back') {
+      S.selected = null;
+      $('review').classList.remove('show-detail');
+      renderList();
+      window.scrollTo(0, 0);
+    } else if (act === 'include') {
+      c.include = t.checked;
+      onCardChange(c, { full: true });
+    } else if (act === 'dup') {
+      c.dupChoice = t.dataset.val;
+      onCardChange(c, { full: true });
+    } else if (act === 'cellsok') {
+      c.cellsOk = true;
+      onCardChange(c, { full: true });
+    } else if (act === 'prev' || act === 'next') {
+      const i = S.cards.indexOf(c) + (act === 'next' ? 1 : -1);
+      if (S.cards[i]) {
+        S.selected = S.cards[i].id;
+        renderList();
+        renderDetail();
+        if (wide()) $('card-detail').scrollIntoView({ block: 'start' });
+        else window.scrollTo(0, 0);
+      }
+    } else if (act === 'add-roster') {
+      busy('명단에 추가 중…');
+      try {
+        S.roster = await run('api_addStudent', { no: c.values.학생번호, name: c.values.이름, grade: '' });
+        toast('명단에 추가했습니다.');
+        onCardChange(c, { full: true });
+      } catch (err) {
+        toast('실패: ' + err.message);
+      } finally {
+        idle();
+      }
+    }
+  });
+
+  /* ---------- 저장 ---------- */
+  function renderSavebar() {
+    const by = { save: 0, overwrite: 0, skip: 0, exclude: 0, blocked: 0, wait: 0 };
+    S.cards.forEach((c) => by[fate(c)]++);
+    const savable = by.save + by.overwrite + by.skip + by.exclude;
+    const parts = [`저장 ${by.save + by.overwrite}장`];
+    if (by.overwrite) parts.push(`덮어쓰기 ${by.overwrite}`);
+    if (by.skip + by.exclude) parts.push(`건너뜀 ${by.skip + by.exclude}`);
+    if (by.blocked) parts.push(`<b style="color:var(--danger)">오류로 보류 ${by.blocked}</b>`);
+    if (by.wait) parts.push(`확인 중 ${by.wait}`);
+    $('savebar').innerHTML = `<div class="sum">${parts.join(' · ')}</div>
+      <button class="btn primary" id="save-btn" ${savable && !by.wait ? '' : 'disabled'}>저장</button>`;
+    $('savebar').classList.toggle('hidden', S.tab !== 'review' || !S.cards.length);
+    $('save-btn').addEventListener('click', saveAll);
+  }
+
+  const labelOf = (c) => `${c.values.학생번호} ${c.values.이름}`;
+
+  async function saveAll() {
+    const cards = S.cards.filter((c) => ['save', 'overwrite'].indexOf(fate(c)) >= 0);
+    const skips = S.cards.filter((c) => ['skip', 'exclude'].indexOf(fate(c)) >= 0);
+    const blocked = S.cards.filter((c) => fate(c) === 'blocked');
+    if (!cards.length && !skips.length) return;
+    let msg = `저장 ${cards.length}장`;
+    const ow = cards.filter((c) => fate(c) === 'overwrite').length;
+    if (ow) msg += ` (그중 덮어쓰기 ${ow}장)`;
+    if (skips.length) msg += `, 건너뛰기 ${skips.length}장`;
+    if (blocked.length) msg += `\n\n오류가 있는 ${blocked.length}장(${blocked.map(labelOf).join(', ')})은 저장하지 않고 확인 화면에 남겨 둡니다.`;
+    if (!confirm(msg + '\n\n저장할까요?')) return;
+
+    S.uploadNames = {};
+    S.uploads.forEach((u) => (S.uploadNames[u.uploadId] = u.fileName));
+    const payload = {
+      cards: cards.map((c) => ({
+        uploadId: c.uploadId,
+        rowNo: c.rowNo,
+        key: C.cardKey(c.values),
+        label: labelOf(c),
+        fileName: c.fileName,
+        values: C.canonical(c.values),
+        overwrite: fate(c) === 'overwrite',
+        edited: C.HEADERS.filter((h) => (c.values[h] || '') !== (c.original[h] || '')),
+        warnings: c.issues.filter((x) => x.level === 'warn' && x.field !== '_dup').map((x) => (x.field[0] === '_' ? '' : x.field + ': ') + x.msg),
+      })),
+      skips: skips.map((c) => ({ uploadId: c.uploadId, rowNo: c.rowNo, label: labelOf(c), reason: fate(c) === 'exclude' ? '저장 안 함' : '중복' })),
+    };
+    busy('저장 중…');
+    const time = new Date().toTimeString().slice(0, 5);
+    let res;
+    try {
+      res = await run('api_save', payload);
+    } catch (e) {
+      S.result = { fatal: e.message };
+      idle();
+      renderReview();
+      window.scrollTo(0, 0);
+      return;
+    }
+    const done = new Set();
+    res.cards.forEach((r) => {
+      const c = S.cards.find((x) => x.uploadId === r.uploadId && x.rowNo === r.rowNo);
+      if (!c) return;
+      if (r.status === 'failed') {
+        c.saveError = r.error;
+        return;
+      }
+      done.add(c.id);
+      S.existing[C.cardKey(c.values)] = { ...C.canonical(c.values), 업로드ID: c.uploadId, 저장일시: time };
+    });
+    res.skips.forEach((s) => done.add(`${s.uploadId}:${s.rowNo}`));
+    S.cards.filter((c) => done.has(c.id)).forEach(clearDraft);
+    S.cards = S.cards.filter((c) => !done.has(c.id));
+    S.uploads = S.uploads.filter((u) => S.cards.some((c) => c.uploadId === u.uploadId) || u.error);
+    S.result = { ...res, time, blocked: blocked.length };
+    if (!S.cards.some((c) => c.id === S.selected)) S.selected = null;
+    revalidate();
+    updateCount();
+    idle();
+    renderReview();
+    renderUploadLog();
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- 명단 ---------- */
+  function renderRoster() {
+    const list = [...S.roster].sort((a, b) => a.no.localeCompare(b.no));
+    $('roster-count').textContent = `(재원 ${list.filter((s) => s.status !== '퇴원').length}명)`;
+    $('roster-body').innerHTML = list.length
+      ? list.map((s) => `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td>
+          <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty">명단이 비어 있습니다. 위에서 불러오세요.</td></tr>';
+    renderRosterDiff();
+  }
+
+  function renderRosterDiff() {
+    const d = S.rosterDiff;
+    if (!d) return ($('roster-diff').innerHTML = '');
+    const item = (kind, key, text, checked) =>
+      `<li><label><input type="checkbox" data-kind="${kind}" data-no="${esc(key)}" ${checked ? 'checked' : ''}>${text}</label></li>`;
+    let html = `<div class="notice" style="margin-top:12px"><b>${esc(d.source)}</b> — 그대로 ${d.same}명`;
+    if (d.noNumber && d.noNumber.length) html += `<div class="muted" style="color:var(--warn)">학생번호가 없어 건너뛴 학생: ${d.noNumber.map(esc).join(', ')}</div>`;
+    if (d.invalid && d.invalid.length) html += `<div class="muted" style="color:var(--warn)">읽지 못한 줄: ${d.invalid.map((x) => `${x.line}번째 줄 "${esc(x.text)}"(${esc(x.reason)})`).join(', ')}</div>`;
+    html += '<ul class="diff-list">';
+    html += d.add.map((s) => item('add', s.no, `<span class="badge ok">추가</span> ${esc(s.no)} ${esc(s.name)} ${esc(s.grade)}`, true)).join('');
+    html += d.update.map((u) => item('update', u.no, `<span class="badge warn">변경</span> ${esc(u.no)} ${esc(u.from.name)} ${esc(u.from.grade)}${u.from.status === '퇴원' ? '(퇴원)' : ''} → <b>${esc(u.to.name)} ${esc(u.to.grade)}</b>`, true)).join('');
+    html += d.missing.map((s) => item('retire', s.no, `<span class="badge off">불러온 명단에 없음</span> ${esc(s.no)} ${esc(s.name)} → 퇴원으로 표시`, false)).join('');
+    html += '</ul>';
+    const n = d.add.length + d.update.length + d.missing.length;
+    html += n ? '<div class="row"><button class="btn primary" id="roster-apply">선택한 변경 반영</button><button class="btn" id="roster-cancel">취소</button></div>'
+      : '<div>바뀐 내용이 없습니다. <button class="btn small" id="roster-cancel">닫기</button></div>';
+    html += '</div>';
+    $('roster-diff').innerHTML = html;
+    $('roster-cancel').addEventListener('click', () => {
+      S.rosterDiff = null;
+      renderRosterDiff();
+    });
+    const apply = $('roster-apply');
+    if (apply) apply.addEventListener('click', async () => {
+      const picked = (kind) => [...$('roster-diff').querySelectorAll(`input[data-kind="${kind}"]:checked`)].map((x) => x.dataset.no);
+      const add = picked('add');
+      const upd = picked('update');
+      const change = {
+        add: d.add.filter((s) => add.indexOf(s.no) >= 0),
+        update: d.update.filter((u) => upd.indexOf(u.no) >= 0).map((u) => ({ no: u.no, name: u.to.name, grade: u.to.grade })),
+        retire: picked('retire'),
+      };
+      busy('명단 반영 중…');
+      try {
+        S.roster = await run('api_applyRoster', change);
+        S.rosterDiff = null;
+        revalidate();
+        renderRoster();
+        toast('명단을 반영했습니다.');
+      } catch (e) {
+        toast('실패: ' + e.message);
+      } finally {
+        idle();
+      }
+    });
+  }
+
+  $('import-payment').addEventListener('click', async () => {
+    busy('결제일 관리 앱에서 불러오는 중…');
+    try {
+      const r = await run('api_fetchPaymentRoster');
+      S.rosterDiff = { source: `결제일 관리에서 ${r.students.length}명 불러옴`, ...C.diffRoster(S.roster, r.students), noNumber: r.noNumber };
+      renderRosterDiff();
+    } catch (e) {
+      $('roster-diff').innerHTML = `<div class="notice err" style="margin-top:12px"><b>자동 불러오기에 실패했습니다.</b><br>${esc(e.message)}
+        <br><br>결제일 관리 앱 → 설정·백업 → <b>진도카드용 명단 복사</b>를 누른 뒤, 여기서 <b>붙여넣어 불러오기</b>를 쓰세요.</div>`;
+    } finally {
+      idle();
+    }
+  });
+  $('paste-toggle').addEventListener('click', () => $('paste-box').classList.toggle('hidden'));
+  $('paste-preview').addEventListener('click', () => {
+    const { list, invalid } = C.parseRosterText($('paste-text').value);
+    S.rosterDiff = { source: `붙여 넣은 명단 ${list.length}명`, ...C.diffRoster(S.roster, list), invalid };
+    renderRosterDiff();
+  });
+
+  /* ---------- 설정 ---------- */
+  function renderSettings() {
+    $('set-done').innerHTML = S.doneOptions.map((o) => `<option ${S.settings.두고옴처리 === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
+    $('set-project').value = S.settings.파이어베이스프로젝트ID || '';
+    $('links').innerHTML = (S.links.sheet ? `<a class="btn" href="${esc(S.links.sheet)}" target="_blank">구글 시트 열기</a>` : '')
+      + (S.links.folder ? `<a class="btn" href="${esc(S.links.folder)}" target="_blank">원본 CSV 폴더 열기</a>` : '');
+    $('account').textContent = S.email ? `로그인 계정: ${S.email}` : '';
+  }
+  async function saveSetting(name, value) {
+    busy('설정 저장 중…');
+    try {
+      S.settings = await run('api_saveSetting', name, value);
+      toast('저장했습니다.');
+    } catch (e) {
+      toast('실패: ' + e.message);
+      renderSettings();
+    } finally {
+      idle();
+    }
+  }
+  $('set-done').addEventListener('change', (e) => saveSetting('두고옴처리', e.target.value));
+  $('set-project-save').addEventListener('click', () => saveSetting('파이어베이스프로젝트ID', $('set-project').value.trim()));
+
+  /* ---------- 시작 ---------- */
+  async function start() {
+    setTopHeight();
+    busy('불러오는 중…');
+    try {
+      const init = await run('api_init');
+      Object.assign(S, { roster: init.roster, settings: init.settings, doneOptions: init.doneOptions, links: init.links, email: init.email });
+      $('who').textContent = init.email || '';
+      await loadPending();
+      if (S.cards.length) show('review');
+    } catch (e) {
+      $('upload-log').innerHTML = `<div class="notice err"><b>시작하지 못했습니다.</b><br>${esc(e.message)}</div>`;
+    } finally {
+      idle();
+    }
+  }
+  start();
+})();
+</script>

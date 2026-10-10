@@ -286,6 +286,7 @@
     $('form-title').textContent = s ? `학생 수정: ${s.name}` : '학생 추가';
     $('f-id').value = s ? s.id : '';
     $('f-name').value = s ? s.name : '';
+    $('f-no').value = s ? s.no || '' : '';
     const grade = (s && s.grade) || '';
     if (grade && !P.GRADES.includes(grade) && ![...$('f-grade').options].some((o) => o.value === grade)) $('f-grade').add(new Option(grade, grade));
     $('f-grade').value = grade;
@@ -306,7 +307,13 @@
     if (!days.length) return alert('등원 요일을 하나 이상 선택해 주세요.');
     const fee = P.parseFee($('f-fee').value);
     if (Number.isNaN(fee)) return alert('원비는 35만처럼 입력해 주세요.');
+    const no = P.normalizeNo($('f-no').value);
+    if (no == null) return alert('학생번호는 숫자 두 자리로 입력해 주세요. (예: 07, 56)');
+    const id = $('f-id').value;
+    const same = no && state.students.find((x) => x.no === no && x.id !== id);
+    if (same) return alert(`학생번호 ${no}번은 이미 ${same.name} 학생이 쓰고 있습니다.`);
     const data = {
+      no,
       name: $('f-name').value.trim(),
       grade: $('f-grade').value,
       minutes: Number($('f-min').value),
@@ -316,7 +323,6 @@
       fee,
       memo: $('f-memo').value.trim(),
     };
-    const id = $('f-id').value;
     if (id) Object.assign(findStudent(id), data);
     else state.students.push({ id: uid(), events: [], history: [], ...data });
     save();
@@ -330,7 +336,7 @@
       ? [...state.students]
           .sort(byMinutesThenName)
           .map(
-            (s) => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.grade || '-')}</td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
+            (s) => `<tr><td>${esc(s.no || '-')}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade || '-')}</td><td>${daysText(s.days)}</td><td>${P.formatMinutes(s.minutes)}</td>
         <td>${P.cycleLabel(s.cycle)}</td><td>${P.fmtDot(s.startDate)}</td><td>${feeText(s)}</td><td class="muted">${esc(s.memo)}</td>
         <td style="white-space:nowrap;text-align:right">
           <button class="btn small" data-open="${s.id}">보기</button>
@@ -338,10 +344,10 @@
           <button class="btn small danger" data-remove="${s.id}">삭제</button></td></tr>`
           )
           .join('')
-      : '<tr><td colspan="9" class="empty">등록된 학생이 없습니다.</td></tr>';
+      : '<tr><td colspan="10" class="empty">등록된 학생이 없습니다.</td></tr>';
     const feeTotal = state.students.reduce((sum, s) => sum + (Number(s.fee) || 0), 0);
     $('stu-foot').innerHTML = state.students.length
-      ? `<tr><td colspan="6">원비 합계</td><td>${feeTotal.toLocaleString('ko-KR')}원</td><td colspan="2"></td></tr>`
+      ? `<tr><td colspan="7">원비 합계</td><td>${feeTotal.toLocaleString('ko-KR')}원</td><td colspan="2"></td></tr>`
       : '';
     const on = (attr, fn) => $('stu-body').querySelectorAll(`[data-${attr}]`).forEach((b) => b.addEventListener('click', () => fn(b.dataset[attr])));
     on('open', (id) => {
@@ -455,6 +461,21 @@
     $('s-state').textContent = '저장했습니다.';
   });
   document.querySelectorAll('input[name="due"]').forEach((r) => r.addEventListener('change', () => $('s-save').click()));
+
+  // 진도 카드 앱(구글 시트)으로 보낼 명단 복사 (자동 불러오기가 안 될 때 쓰는 예비 방법)
+  $('roster-copy').addEventListener('click', async () => {
+    const text = P.rosterText(state.students);
+    const missing = state.students.filter((s) => !s.no).map((s) => s.name);
+    $('roster-text').value = text;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      $('roster-text').select();
+      document.execCommand('copy');
+    }
+    $('roster-state').textContent = `${text ? text.split('\n').length : 0}명을 복사했습니다.`
+      + (missing.length ? ` 학생번호가 없어 빠진 학생: ${missing.join(', ')}` : '');
+  });
 
   $('export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
