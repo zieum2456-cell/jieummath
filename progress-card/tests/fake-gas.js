@@ -157,8 +157,13 @@ class Folder {
 }
 
 function makeBlob(bytes, type, name) {
-  const buf = Buffer.isBuffer(bytes) ? bytes : toBuffer(bytes);
-  return { name, type, buf, getDataAsString: () => buf.toString('utf8') };
+  const buf = Buffer.isBuffer(bytes) ? bytes : typeof bytes === 'string' ? Buffer.from(bytes, 'utf8') : toBuffer(bytes);
+  const blob = { name, type, buf, getDataAsString: () => buf.toString('utf8'), getName: () => blob.name };
+  blob.setName = (n) => {
+    blob.name = n;
+    return blob;
+  };
+  return blob;
 }
 
 /**
@@ -199,6 +204,9 @@ function loadGas(opts = {}) {
     UrlFetchApp: {
       fetch: (url, o) => {
         fetchLog.push({ url, o });
+        if (/\/export\?format=xlsx$/.test(url)) {
+          return { getResponseCode: () => 200, getBlob: () => makeBlob(Buffer.from('PK-fake-xlsx'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'export.xlsx') };
+        }
         const code = opts.firestoreStatus || 200;
         const body = code === 200
           ? JSON.stringify([

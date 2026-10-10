@@ -294,10 +294,100 @@
     return { add, update, missing, same };
   }
 
+  /* ---------- 기간 · 집계 (2단계) ---------- */
+
+  const LEVELS = ['기본', '기본+유형', '기본+응용'];
+  const GROUPS = ['A', 'B'];
+  const GRADES = ['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
+  // 설정 "두고옴처리" 값 → 완료율 계산에서의 가중치 (null = 계산에서 제외)
+  const LEFT_WEIGHT = { '안 함과 같이(×0)': 0, '미완과 같이(×0.5)': 0.5, '계산에서 제외': null };
+  const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+  const toUTC = (d) => new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)));
+  const fromUTC = (t) => t.toISOString().slice(0, 10);
+  const addDays = (d, n) => fromUTC(new Date(toUTC(d).getTime() + n * 86400000));
+  const weekday = (d) => (validDate(d) ? WEEKDAYS[toUTC(d).getUTCDay()] : '');
+
+  /** 기간 단추 → { from, to } ('' = 제한 없음). today: 'YYYY-MM-DD' */
+  function periodRange(preset, today) {
+    if (preset === '2w') return { from: addDays(today, -13), to: today };
+    if (preset === '4w') return { from: addDays(today, -27), to: today };
+    if (preset === 'month') return { from: today.slice(0, 8) + '01', to: today };
+    if (preset === 'lastMonth') {
+      const end = addDays(today.slice(0, 8) + '01', -1);
+      return { from: end.slice(0, 8) + '01', to: end };
+    }
+    return { from: '', to: '' };
+  }
+  const inPeriod = (date, p) => (!p.from || date >= p.from) && (!p.to || date <= p.to);
+
+  /**
+   * 과제 완료율 = (완료 + 미완×0.5 + 두고 옴×가중치) ÷ (과제 없음을 뺀 횟수)
+   * "두고 옴"을 계산에서 제외하면 분모에서도 뺀다. 지난과제가 비어 있는 기록(결강 등)은 세지 않는다.
+   */
+  function homework(records, leftMode) {
+    const counts = { 완료: 0, 미완: 0, '안 함': 0, '두고 옴': 0, '과제 없음': 0 };
+    records.forEach((r) => {
+      if (r.지난과제 in counts) counts[r.지난과제]++;
+    });
+    const w = leftMode in LEFT_WEIGHT ? LEFT_WEIGHT[leftMode] : 0;
+    const denom = counts.완료 + counts.미완 + counts['안 함'] + (w === null ? 0 : counts['두고 옴']);
+    const num = counts.완료 + counts.미완 * 0.5 + (w ? counts['두고 옴'] * w : 0);
+    return { counts, denom, rate: denom ? num / denom : null };
+  }
+
+  /** 단계 변화: 날짜순으로 단계 조합이 바뀐 지점만 → [{ date, stage, count }] */
+  function stageChanges(records) {
+    const out = [];
+    [...records].sort((a, b) => a.수업일.localeCompare(b.수업일)).forEach((r) => {
+      const order = (t) => (ENUMS.단계.indexOf(t) < 0 ? 99 : ENUMS.단계.indexOf(t));
+      const stage = splitList(r.단계).sort((a, b) => order(a) - order(b)).join('·');
+      if (!stage) return;
+      const last = out[out.length - 1];
+      if (last && last.stage === stage) last.count++;
+      else out.push({ date: r.수업일, stage, count: 1 });
+    });
+    return out;
+  }
+
+  /** 학생 한 명의 기간 집계 */
+  function summarize(records, opts) {
+    opts = opts || {};
+    const rs = [...records].sort((a, b) => a.수업일.localeCompare(b.수업일));
+    const attendance = { 정규: 0, 보강: 0, 결강: 0 };
+    rs.forEach((r) => {
+      if (r.출결 in attendance) attendance[r.출결]++;
+    });
+    const mins = rs.filter((r) => r.출결 !== '결강').map((r) => Number(r['수업시간(분)'])).filter((n) => n > 0);
+    const errorMap = {};
+    rs.forEach((r) => splitList(r.오답원인).forEach((t) => (errorMap[t] = (errorMap[t] || 0) + 1)));
+    const errors = Object.keys(errorMap).map((k) => [k, errorMap[k]])
+      .sort((a, b) => b[1] - a[1] || ENUMS.오답원인.indexOf(a[0]) - ENUMS.오답원인.indexOf(b[0]));
+    return {
+      count: rs.length,
+      from: rs.length ? rs[0].수업일 : '',
+      to: rs.length ? rs[rs.length - 1].수업일 : '',
+      attendance,
+      homework: homework(rs, opts.leftMode),
+      errors,
+      points: rs.reduce((sum, r) => sum + (Number(r.추가포인트) || 0), 0),
+      avgMinutes: mins.length ? Math.round(mins.reduce((a, b) => a + b, 0) / mins.length) : null,
+      stages: stageChanges(rs),
+    };
+  }
+
+  /** CSV 한 칸 (쉼표·따옴표·줄바꿈이 있으면 따옴표로 감싼다) */
+  const csvCell = (v) => {
+    const s = String(v == null ? '' : v);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const toCsv = (rows) => '\uFEFF' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+
   const api = {
     HEADERS, ENUMS, MULTI, RANGE_COLS, BOOKS, MARKS,
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
     validateCard, canonical, rankOf, normalizeNo, parseRosterText, diffRoster,
+    LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.Core = api;

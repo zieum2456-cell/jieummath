@@ -135,3 +135,50 @@ test('명단 붙여넣기 해석과 비교', () => {
   assert.deepEqual(d.update.map((u) => [u.no, u.to.grade]), [['56', '초4']]);
   assert.deepEqual(d.missing, [{ no: '43', name: '이지아' }]);
 });
+
+/* ---------- 2단계: 기간 · 집계 ---------- */
+const rec = (d, patch) => ({ ...base(), 수업일: d, ...patch });
+
+test('기간 단추', () => {
+  assert.deepEqual(C.periodRange('2w', '2026-10-10'), { from: '2026-09-27', to: '2026-10-10' });
+  assert.deepEqual(C.periodRange('month', '2026-10-10'), { from: '2026-10-01', to: '2026-10-10' });
+  assert.deepEqual(C.periodRange('lastMonth', '2026-03-05'), { from: '2026-02-01', to: '2026-02-28' });
+  assert.deepEqual(C.periodRange('all', '2026-10-10'), { from: '', to: '' });
+  assert.ok(C.inPeriod('2026-10-01', { from: '2026-10-01', to: '' }));
+  assert.ok(!C.inPeriod('2026-09-30', { from: '2026-10-01', to: '' }));
+  assert.equal(C.weekday('2026-10-09'), '금');
+});
+
+test('과제 완료율: (완료 + 미완×0.5) / 과제 없음을 뺀 횟수, 두고 옴은 설정대로', () => {
+  const rs = ['완료', '완료', '미완', '안 함', '두고 옴', '과제 없음', ''].map((x, i) => rec(`2026-10-0${i + 1}`, { 지난과제: x }));
+  const zero = C.homework(rs, '안 함과 같이(×0)');
+  assert.equal(zero.denom, 5);
+  assert.equal(zero.rate, 2.5 / 5);
+  assert.equal(C.homework(rs, '미완과 같이(×0.5)').rate, 3 / 5);
+  const ex = C.homework(rs, '계산에서 제외');
+  assert.equal(ex.denom, 4);
+  assert.equal(ex.rate, 2.5 / 4);
+  assert.equal(C.homework([rec('2026-10-01', { 지난과제: '과제 없음' })], '').rate, null);
+});
+
+test('학생 기간 집계', () => {
+  const rs = [
+    rec('2026-10-06', { 출결: '정규', 단계: '개념', 오답원인: '계산 실수', 추가포인트: '3', '수업시간(분)': '90' }),
+    rec('2026-10-01', { 출결: '정규', 단계: '개념', 오답원인: '계산 실수; 조건 놓침', 추가포인트: '0', '수업시간(분)': '80' }),
+    rec('2026-10-08', { 출결: '결강', 단계: '', 오답원인: '', 추가포인트: '', '수업시간(분)': '', 지난과제: '' }),
+    rec('2026-10-09', { 출결: '보강', 단계: '유형; 개념', 오답원인: '', 추가포인트: '9', '수업시간(분)': '55' }),
+  ];
+  const s = C.summarize(rs, { leftMode: '안 함과 같이(×0)' });
+  assert.equal(s.count, 4);
+  assert.deepEqual(s.attendance, { 정규: 2, 보강: 1, 결강: 1 });
+  assert.equal(s.points, 12);
+  assert.equal(s.avgMinutes, 75);
+  assert.deepEqual(s.errors, [['계산 실수', 2], ['조건 놓침', 1]]);
+  assert.deepEqual(s.stages, [{ date: '2026-10-01', stage: '개념', count: 2 }, { date: '2026-10-09', stage: '개념·유형', count: 1 }]);
+  assert.equal(s.from, '2026-10-01');
+  assert.equal(s.homework.denom, 3);
+});
+
+test('CSV 내보내기 형식', () => {
+  assert.equal(C.toCsv([['a', 'b,c'], ['줄\n바꿈', '"인용"']]), '﻿a,"b,c"\r\n"줄\n바꿈","""인용"""\r\n');
+});

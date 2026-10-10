@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS = [
 const DONE_OPTIONS = ['안 함과 같이(×0)', '미완과 같이(×0.5)', '계산에서 제외'];
 const PENDING = ['확인 대기', '일부 저장'];
 const ROOT_FOLDER_NAME = '진도카드 원본';
+const EXPORT_FOLDER_NAME = '진도카드 내보내기';
 
 /* ---------- 웹 앱 ---------- */
 
@@ -612,6 +613,79 @@ function errorText_(res) {
   } catch (e) {
     return res.getContentText().slice(0, 200);
   }
+}
+
+/* ---------- 트래킹 (2단계) ---------- */
+
+/** 저장된 수업기록 전체 (화면에서 기간·학생별로 나눠 계산한다) */
+function api_records() {
+  const keep = ['기록ID'].concat(CSV_HEADERS, ['확인필요상태', '수정한칸', '저장일시', '수정일시']);
+  return readObjects_('records')
+    .filter((r) => r.기록ID)
+    .map((r) => {
+      const o = {};
+      keep.forEach((h) => (o[h] = r[h] == null ? '' : r[h]));
+      return o;
+    });
+}
+
+const LEVELS = ['기본', '기본+유형', '기본+응용'];
+const STATUSES = ['재원', '퇴원'];
+
+/**
+ * 명단 한 명 추가·수정 (학생번호는 api_changeNo 로만 바꾼다)
+ * s: { no, name, grade, level, group, status, memo, isNew }
+ */
+function api_saveStudent(s) {
+  return withLock_(() => {
+    const no = String(s.no || '');
+    const name = String(s.name || '').trim();
+    if (!/^\d{2}$/.test(no)) throw new Error('학생번호는 숫자 두 자리여야 합니다.');
+    if (!name) throw new Error('이름을 입력해 주세요.');
+    if (s.level && LEVELS.indexOf(s.level) < 0) throw new Error('디딤돌 레벨은 ' + LEVELS.join(' / ') + ' 중 하나여야 합니다.');
+    if (s.group && ['A', 'B'].indexOf(s.group) < 0) throw new Error('발송 조는 A 또는 B여야 합니다.');
+    const status = s.status || '재원';
+    if (STATUSES.indexOf(status) < 0) throw new Error('상태는 재원 또는 퇴원이어야 합니다.');
+    const rows = readObjects_('roster');
+    const r = rows.find((x) => x.학생번호 === no);
+    const obj = { 학생번호: no, 이름: name, 학년: s.grade || '', 디딤돌레벨: s.level || '', 발송조: s.group || '', 상태: status, 메모: s.memo || '', 수정일시: now_() };
+    if (s.isNew) {
+      if (r) throw new Error(`${no}번은 이미 ${r.이름} 학생이 쓰고 있습니다.`);
+      appendObjects_('roster', [obj]);
+    } else {
+      if (!r) throw new Error(`명단에 ${no}번 학생이 없습니다.`);
+      writeObject_('roster', r._row, obj);
+    }
+    return rosterList_();
+  });
+}
+
+/**
+ * 전체 기록 내보내기 → 드라이브 "진도카드 내보내기" 폴더에 파일을 만들고 링크를 돌려준다
+ * kind: 'csv' (수업기록 탭, UTF-8) | 'xlsx' (시트 전체: 학생명단·수업기록·업로드이력·설정)
+ */
+function api_export(kind) {
+  const ss = ss_();
+  const stamp = Utilities.formatDate(new Date(), TZ, 'yyyyMMdd-HHmm');
+  const it = DriveApp.getFoldersByName(EXPORT_FOLDER_NAME);
+  const folder = it.hasNext() ? it.next() : DriveApp.createFolder(EXPORT_FOLDER_NAME);
+  let blob;
+  if (kind === 'csv') {
+    const values = sheet_('records').getDataRange().getDisplayValues();
+    const csv = '\uFEFF' + values.map((row) => row.map((v) => (/[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v)).join(',')).join('\r\n') + '\r\n';
+    blob = Utilities.newBlob(csv, 'text/csv', `진도카드_수업기록_${stamp}.csv`);
+  } else if (kind === 'xlsx') {
+    const res = UrlFetchApp.fetch(`https://docs.google.com/spreadsheets/d/${ss.getId()}/export?format=xlsx`, {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() !== 200) throw new Error(`엑셀 파일을 만들지 못했습니다 (${res.getResponseCode()}).`);
+    blob = res.getBlob().setName(`진도카드_전체기록_${stamp}.xlsx`);
+  } else {
+    throw new Error('알 수 없는 형식입니다.');
+  }
+  const file = folder.createFile(blob);
+  return { name: file.getName(), url: file.getUrl(), folderUrl: folder.getUrl() };
 }
 
 /* ---------- 설정 ---------- */

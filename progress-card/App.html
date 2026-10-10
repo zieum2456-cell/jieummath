@@ -58,14 +58,16 @@
 
   function show(tab) {
     S.tab = tab;
-    ['upload', 'review', 'roster', 'settings'].forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== tab));
+    ['upload', 'review', 'student', 'day', 'summary', 'roster', 'settings'].forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== tab));
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     $('savebar').classList.toggle('hidden', tab !== 'review' || !S.cards.length);
     if (tab === 'review') renderReview();
     if (tab === 'roster') renderRoster();
     if (tab === 'settings') renderSettings();
+    if (TRACK_TABS.indexOf(tab) >= 0) ensureRecords().then((ok) => ok && S.tab === tab && renderTracking());
     window.scrollTo(0, 0);
   }
+  const TRACK_TABS = ['student', 'day', 'summary'];
   document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
 
   /* ---------- 임시 저장 (이 기기에서 고치던 내용) ---------- */
@@ -363,7 +365,7 @@
   function cardBadges(c) {
     const b = [];
     const review = C.splitList(c.values.확인필요).length;
-    if (review) b.push(`<span class="badge review">확인필요 ${review}</span>`);
+    if (review) b.push(`<span class="badge rv">확인필요 ${review}</span>`);
     const e = c.issues.filter((x) => x.level === 'error').length;
     const w = c.issues.filter((x) => x.level === 'warn' && x.field !== '_dup').length;
     if (e) b.push(`<span class="badge err">오류 ${e}</span>`);
@@ -714,6 +716,7 @@
     S.cards = S.cards.filter((c) => !done.has(c.id));
     S.uploads = S.uploads.filter((u) => S.cards.some((c) => c.uploadId === u.uploadId) || u.error);
     S.result = { ...res, time, blocked: blocked.length };
+    S.records = null; // 트래킹 화면은 다음에 열 때 새로 불러온다
     if (!S.cards.some((c) => c.id === S.selected)) S.selected = null;
     revalidate();
     updateCount();
@@ -724,19 +727,38 @@
   }
 
   /* ---------- 명단 ---------- */
+  function editRow(s, isNew) {
+    const opt = (list, v, blank) => (blank ? `<option value="">${blank}</option>` : '')
+      + [...list, ...(v && list.indexOf(v) < 0 ? [v] : [])].map((o) => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('');
+    return `<tr class="editing"><td colspan="8"><div class="edit-grid">
+      <label>학생번호<input data-f="no" value="${esc(s.no)}" inputmode="numeric" maxlength="2" ${isNew ? '' : 'disabled'} autocomplete="off"></label>
+      <label>이름<input data-f="name" value="${esc(s.name)}" autocomplete="off"></label>
+      <label>학년<select data-f="grade">${opt(C.GRADES, s.grade, '-')}</select></label>
+      <label>디딤돌 레벨<select data-f="level">${opt(C.LEVELS, s.level, '-')}</select></label>
+      <label>발송 조<select data-f="group">${opt(C.GROUPS, s.group, '-')}</select></label>
+      <label>상태<select data-f="status">${opt(['재원', '퇴원'], s.status || '재원')}</select></label>
+      <label class="wide">메모<input data-f="memo" value="${esc(s.memo)}" autocomplete="off"></label></div>
+      <div class="row"><button class="btn small primary" data-edit-save="${isNew ? 'new' : esc(s.no)}">저장</button>
+      <button class="btn small" data-edit-cancel>취소</button>
+      ${isNew ? '' : '<span class="muted">번호를 바꾸려면 [번호 변경]을 쓰세요.</span>'}</div></td></tr>`;
+  }
+
   function renderRoster() {
     const list = [...S.roster].sort((a, b) => a.no.localeCompare(b.no));
     $('roster-count').textContent = `(재원 ${list.filter((s) => s.status !== '퇴원').length}명)`;
-    $('roster-body').innerHTML = list.length
-      ? list.map((s) => `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td>
-          <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td>
-          <td><button class="btn small" data-chno="${esc(s.no)}">번호 변경</button></td></tr>`
-          + (S.chNo === s.no ? `<tr><td colspan="7"><div class="row">
+    const rows = list.map((s) => {
+      if (S.editNo === s.no) return editRow(s, false);
+      return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td>
+          <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td><td class="muted">${esc(s.memo)}</td>
+          <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button></td></tr>`
+          + (S.chNo === s.no ? `<tr><td colspan="8"><div class="row">
             <span>${esc(s.no)}번 ${esc(s.name)} → 새 번호</span>
             <input id="chno-input" inputmode="numeric" maxlength="2" style="width:80px" autocomplete="off">
             <button class="btn small primary" id="chno-go">변경</button><button class="btn small" id="chno-cancel">취소</button></div>
-            <div class="muted">이 학생의 수업기록(학생번호·기록ID)도 함께 바뀝니다. 결제일 관리 앱의 학생번호는 따로 바꿔 주세요.</div></td></tr>` : '')).join('')
-      : '<tr><td colspan="7" class="empty">명단이 비어 있습니다. 위에서 불러오세요.</td></tr>';
+            <div class="muted">이 학생의 수업기록(학생번호·기록ID)도 함께 바뀝니다. 결제일 관리 앱의 학생번호는 따로 바꿔 주세요.</div></td></tr>` : '');
+    });
+    if (S.editNo === 'new') rows.unshift(editRow({ no: '', name: '', grade: '', level: '', group: '', status: '재원', memo: '' }, true));
+    $('roster-body').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="8" class="empty">명단이 비어 있습니다. 위에서 불러오세요.</td></tr>';
     renderRosterDiff();
     const input = $('chno-input');
     if (input) {
@@ -749,11 +771,48 @@
     }
   }
 
-  $('roster-body').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-chno]');
-    if (!b) return;
-    S.chNo = S.chNo === b.dataset.chno ? null : b.dataset.chno;
+  $('stu-add').addEventListener('click', () => {
+    S.editNo = 'new';
+    S.chNo = null;
     renderRoster();
+  });
+
+  $('roster-body').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-chno],[data-edit],[data-edit-save],[data-edit-cancel]');
+    if (!b) return;
+    if (b.dataset.chno) {
+      S.chNo = S.chNo === b.dataset.chno ? null : b.dataset.chno;
+      S.editNo = null;
+      return renderRoster();
+    }
+    if (b.dataset.edit) {
+      S.editNo = b.dataset.edit;
+      S.chNo = null;
+      return renderRoster();
+    }
+    if (b.hasAttribute('data-edit-cancel')) {
+      S.editNo = null;
+      return renderRoster();
+    }
+    const tr = b.closest('tr');
+    const val = (f) => tr.querySelector(`[data-f="${f}"]`).value.trim();
+    const isNew = b.dataset.editSave === 'new';
+    const no = isNew ? C.normalizeNo(val('no')) : b.dataset.editSave;
+    if (no == null) return toast('학생번호는 숫자 두 자리로 입력해 주세요.');
+    busy('저장 중…');
+    try {
+      S.roster = await run('api_saveStudent', {
+        isNew, no, name: val('name'), grade: val('grade'), level: val('level'), group: val('group'), status: val('status'), memo: val('memo'),
+      });
+      S.editNo = null;
+      revalidate();
+      renderRoster();
+      toast('저장했습니다.');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      idle();
+    }
   });
 
   // 학생번호 변경: 먼저 몇 건이 바뀌는지 확인하고, 한 번 더 물은 뒤 바꾼다
@@ -777,6 +836,7 @@
       const r = await run('api_changeNo', { from, to });
       S.roster = r.roster;
       S.chNo = null;
+      S.records = null;
       // 저장된 기록 조회 결과가 바뀌었으니 확인 대기 카드를 다시 검사한다
       S.existing = {};
       await loadPending();
@@ -855,6 +915,255 @@
     S.rosterDiff = { source: `붙여 넣은 명단 ${list.length}명`, ...C.diffRoster(S.roster, list), invalid };
     renderRosterDiff();
   });
+
+  /* ---------- 트래킹: 학생별 · 날짜별 · 기간 집계 ---------- */
+  function today() {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+  const store = {
+    get: (k) => {
+      try {
+        return localStorage.getItem('pc-' + k);
+      } catch (e) {
+        return null;
+      }
+    },
+    set: (k, v) => {
+      try {
+        localStorage.setItem('pc-' + k, v);
+      } catch (e) { /* 무시 */ }
+    },
+  };
+  S.records = null;
+  S.period = { preset: store.get('period') || '2w' };
+  Object.assign(S.period, C.periodRange(S.period.preset, today()));
+  S.stuNo = store.get('stu') || '';
+  S.day = '';
+  S.sumGroup = '';
+
+  async function ensureRecords(force) {
+    if (S.records && !force) return true;
+    busy('기록 불러오는 중…');
+    try {
+      S.records = await run('api_records');
+      return true;
+    } catch (e) {
+      toast('기록을 불러오지 못했습니다: ' + e.message);
+      return false;
+    } finally {
+      idle();
+    }
+  }
+  document.querySelectorAll('.reload-btn').forEach((b) => b.addEventListener('click', async () => {
+    const [roster] = await Promise.all([run('api_init').then((x) => x.roster).catch(() => S.roster), ensureRecords(true)]);
+    S.roster = roster;
+    renderTracking();
+  }));
+
+  function renderTracking() {
+    if (!S.records) return;
+    if (S.tab === 'student') renderStudent();
+    if (S.tab === 'day') renderDay();
+    if (S.tab === 'summary') renderSummary();
+  }
+
+  const pct = (x) => (x == null ? '-' : Math.round(x * 100) + '%');
+  const md = (d) => (C.validDate(d) ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}(${C.weekday(d)})` : d);
+  const student = (no) => S.roster.find((r) => r.no === no);
+  const leftMode = () => S.settings.두고옴처리;
+
+  /* 기간 단추 (학생별·집계 화면 공용) */
+  const PRESETS = [['2w', '최근 2주'], ['4w', '최근 4주'], ['month', '이번 달'], ['lastMonth', '지난 달'], ['all', '전체']];
+  function renderPeriodBars() {
+    document.querySelectorAll('[data-period]').forEach((el) => {
+      el.innerHTML = `<div class="seg">${PRESETS.map(([k, l]) => `<button type="button" data-preset="${k}" class="${S.period.preset === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div class="row period-dates"><input type="date" data-pfrom value="${esc(S.period.from)}" aria-label="시작일"> ~ <input type="date" data-pto value="${esc(S.period.to)}" aria-label="종료일"></div>`;
+    });
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-preset]');
+    if (!b) return;
+    S.period = { preset: b.dataset.preset, ...C.periodRange(b.dataset.preset, today()) };
+    store.set('period', b.dataset.preset);
+    renderTracking();
+  });
+  document.addEventListener('change', (e) => {
+    if (!e.target.matches('[data-pfrom],[data-pto]')) return;
+    const bar = e.target.closest('[data-period]');
+    S.period = { preset: 'custom', from: bar.querySelector('[data-pfrom]').value, to: bar.querySelector('[data-pto]').value };
+    renderTracking();
+  });
+
+  function statsHtml(st) {
+    const a = st.attendance;
+    const h = st.homework;
+    const hc = h.counts;
+    const left = leftMode() === '계산에서 제외' ? '두고 옴(제외)' : '두고 옴';
+    return `<div class="stats">
+      <div class="stat"><div class="k">수업</div><div class="v">${st.count}회</div><div class="s">정규 ${a.정규} · 보강 ${a.보강} · 결강 ${a.결강}</div></div>
+      <div class="stat"><div class="k">과제 완료율</div><div class="v">${pct(h.rate)}</div>
+        <div class="s">완료 ${hc.완료} · 미완 ${hc.미완} · 안 함 ${hc['안 함']} · ${left} ${hc['두고 옴']} (과제 없음 ${hc['과제 없음']})</div></div>
+      <div class="stat"><div class="k">추가 포인트</div><div class="v">${st.points}점</div></div>
+      <div class="stat"><div class="k">평균 수업시간</div><div class="v">${st.avgMinutes == null ? '-' : st.avgMinutes + '분'}</div><div class="s">결강 제외</div></div>
+    </div>
+    <h3>오답 원인</h3><div class="chips">${st.errors.length ? st.errors.map(([t, n]) => `<span class="chip">${esc(t)} <b>${n}</b></span>`).join('') : '<span class="muted">없음</span>'}</div>
+    <h3>단계 변화</h3>${st.stages.length ? `<ol class="stages">${st.stages.map((x) => `<li>${md(x.date)}부터 <b>${esc(x.stage)}</b> <span class="muted">${x.count}회</span></li>`).join('')}</ol>` : '<span class="muted">없음</span>'}`;
+  }
+
+  /** 수업 기록 한 장 (타임라인·날짜별 공용). who: 학생 이름을 머리에 보여 줄지 */
+  function entryHtml(r, who) {
+    const absent = r.출결 === '결강';
+    const time = r.등원 || r.하원 ? `${esc(r.등원)}~${esc(r.하원)}${r['수업시간(분)'] ? ` · ${esc(r['수업시간(분)'])}분` : ''}` : '';
+    const st = student(r.학생번호);
+    const head = who
+      ? `<button class="who" data-goto="${esc(r.학생번호)}">${esc(r.학생번호)} ${esc(st ? st.name : r.이름)}</button>`
+      : `<b>${md(r.수업일)}</b>`;
+    const row = (k, v) => (v ? `<div class="k">${k}</div><div>${v}</div>` : '');
+    const chips = (t) => (C.splitList(t).length ? `<div class="chips">${rangePreview(t)}</div>` : '');
+    const hw = r.지난과제 ? `${esc(r.지난과제)}${chips(r.지난과제범위)}` : chips(r.지난과제범위);
+    return `<div class="entry ${absent ? 'absent' : ''}">
+      <div class="entry-head">${head} <span class="badge ${r.출결 === '보강' ? 'warn' : absent ? 'off' : ''}">${esc(r.출결)}</span>
+        <span class="muted">${time}</span>${Number(r.추가포인트) ? ` <span class="badge ok">+${esc(r.추가포인트)}점</span>` : ''}
+        ${r.확인필요상태 === '해결' ? '<span class="badge rv" title="판독 확인필요 항목을 확인함">판독 확인</span>' : ''}</div>
+      <div class="entry-grid">
+        ${row('단계', [C.splitList(r.단계).join('·'), r.진행률].filter(Boolean).map(esc).join(' · '))}
+        ${row('지난 과제', hw)}
+        ${row('오늘 진도', chips(r.오늘진도범위))}
+        ${row('추가 포인트', chips(r.추가포인트범위))}
+        ${row('오늘 과제', chips(r.오늘과제))}
+        ${row('오답 원인', esc(C.splitList(r.오답원인).join(', ')))}
+        ${row('학습태도', esc(r.학습태도).replace(/\n/g, '<br>'))}
+      </div></div>`;
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-goto]');
+    if (!b) return;
+    S.stuNo = b.dataset.goto;
+    store.set('stu', S.stuNo);
+    show('student');
+  });
+
+  /* 학생별 */
+  function studentOptions() {
+    const nos = new Set(S.roster.map((r) => r.no));
+    const extra = [...new Set(S.records.map((r) => r.학생번호))].filter((n) => !nos.has(n)).sort();
+    const label = (s) => `${s.no} ${s.name}${s.grade ? ` (${s.grade})` : ''}`;
+    const sorted = [...S.roster].sort((a, b) => a.no.localeCompare(b.no));
+    const active = sorted.filter((s) => s.status !== '퇴원');
+    const gone = sorted.filter((s) => s.status === '퇴원');
+    const opt = (no, text) => `<option value="${esc(no)}" ${no === S.stuNo ? 'selected' : ''}>${esc(text)}</option>`;
+    return active.map((s) => opt(s.no, label(s))).join('')
+      + (gone.length ? `<optgroup label="퇴원">${gone.map((s) => opt(s.no, label(s))).join('')}</optgroup>` : '')
+      + (extra.length ? `<optgroup label="명단에 없는 번호">${extra.map((n) => opt(n, n + '번')).join('')}</optgroup>` : '');
+  }
+  function renderStudent() {
+    renderPeriodBars();
+    const all = [...S.roster.map((r) => r.no), ...S.records.map((r) => r.학생번호)];
+    if (!all.includes(S.stuNo)) S.stuNo = ([...S.roster].filter((s) => s.status !== '퇴원').sort((a, b) => a.no.localeCompare(b.no))[0] || {}).no || all[0] || '';
+    $('stu-select').innerHTML = studentOptions() || '<option>명단이 비어 있습니다</option>';
+    const recs = S.records.filter((r) => r.학생번호 === S.stuNo && C.inPeriod(r.수업일, S.period)).sort((a, b) => a.수업일.localeCompare(b.수업일));
+    const st = student(S.stuNo);
+    const range = S.period.from || S.period.to ? `${S.period.from ? md(S.period.from) : '처음'} ~ ${S.period.to ? md(S.period.to) : '오늘'}` : '전체 기간';
+    $('stu-summary').innerHTML = `<div class="card"><h2>${esc(S.stuNo)} ${esc(st ? st.name : '')} <span class="muted">${esc([st && st.grade, st && st.level, st && st.group ? st.group + '조' : ''].filter(Boolean).join(' · '))}</span></h2>
+      <div class="muted" style="margin:-6px 0 10px">${range}</div>${statsHtml(C.summarize(recs, { leftMode: leftMode() }))}</div>`;
+    $('stu-timeline').innerHTML = recs.length ? recs.map((r) => entryHtml(r, false)).join('') : '<div class="empty">이 기간에 저장된 기록이 없습니다.</div>';
+  }
+  $('stu-select').addEventListener('change', (e) => {
+    S.stuNo = e.target.value;
+    store.set('stu', S.stuNo);
+    renderStudent();
+  });
+
+  /* 날짜별 */
+  const recordDates = () => [...new Set(S.records.map((r) => r.수업일))].sort();
+  function renderDay() {
+    const dates = recordDates();
+    if (!S.day) S.day = dates[dates.length - 1] || today();
+    $('day-input').value = S.day;
+    const counts = {};
+    S.records.forEach((r) => (counts[r.수업일] = (counts[r.수업일] || 0) + 1));
+    $('day-recent').innerHTML = dates.slice(-10).reverse()
+      .map((d) => `<button type="button" class="chip ${d === S.day ? 'done' : ''}" data-day="${d}" style="cursor:pointer">${md(d)} <b>${counts[d]}</b></button>`).join('')
+      || '<span class="muted">저장된 기록이 없습니다.</span>';
+    const recs = S.records.filter((r) => r.수업일 === S.day)
+      .sort((a, b) => (a.등원 || '99').localeCompare(b.등원 || '99') || a.학생번호.localeCompare(b.학생번호));
+    const att = (k) => recs.filter((r) => r.출결 === k).length;
+    $('day-list').innerHTML = `<h2 style="margin:4px 4px 10px;font-size:18px">${md(S.day)} · ${recs.length}명
+      <span class="muted">정규 ${att('정규')} · 보강 ${att('보강')} · 결강 ${att('결강')}</span></h2>`
+      + (recs.length ? `<div class="day-grid">${recs.map((r) => entryHtml(r, true)).join('')}</div>` : '<div class="empty">이 날짜에 저장된 기록이 없습니다.</div>');
+  }
+  $('day-recent').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-day]');
+    if (!b) return;
+    S.day = b.dataset.day;
+    renderDay();
+  });
+  $('day-input').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    S.day = e.target.value;
+    renderDay();
+  });
+  const stepDay = (dir) => {
+    const dates = recordDates();
+    const next = dir > 0 ? dates.find((d) => d > S.day) : [...dates].reverse().find((d) => d < S.day);
+    if (!next) return toast(dir > 0 ? '다음 수업일 기록이 없습니다.' : '이전 수업일 기록이 없습니다.');
+    S.day = next;
+    renderDay();
+  };
+  $('day-prev').addEventListener('click', () => stepDay(-1));
+  $('day-next').addEventListener('click', () => stepDay(1));
+
+  /* 기간 집계 */
+  function renderSummary() {
+    renderPeriodBars();
+    $('sum-group').innerHTML = [['', '전체'], ['A', 'A조'], ['B', 'B조']]
+      .map(([k, l]) => `<button type="button" data-group="${k}" class="${S.sumGroup === k ? 'on' : ''}">${l}</button>`).join('');
+    const recs = S.records.filter((r) => C.inPeriod(r.수업일, S.period));
+    const by = {};
+    recs.forEach((r) => (by[r.학생번호] = by[r.학생번호] || []).push(r));
+    let people = S.roster.filter((s) => s.status !== '퇴원' || by[s.no]);
+    if (!S.sumGroup) {
+      const known = new Set(S.roster.map((s) => s.no));
+      Object.keys(by).filter((n) => !known.has(n)).forEach((n) => people.push({ no: n, name: '(명단에 없음)' }));
+    } else people = people.filter((s) => s.group === S.sumGroup);
+    people.sort((a, b) => a.no.localeCompare(b.no));
+    $('sum-body').innerHTML = people.length ? people.map((s) => {
+      const rs = by[s.no] || [];
+      const st = C.summarize(rs, { leftMode: leftMode() });
+      const a = st.attendance;
+      const last = st.stages[st.stages.length - 1];
+      return `<tr data-goto="${esc(s.no)}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b>${s.status === '퇴원' ? ' <span class="muted">퇴원</span>' : ''}</td>
+        <td>${esc([s.level, s.group ? s.group + '조' : ''].filter(Boolean).join(' · ') || '-')}</td>
+        <td>${rs.length ? `${a.정규} · ${a.보강} · ${a.결강}` : '<span class="muted">기록 없음</span>'}</td>
+        <td class="${st.homework.rate != null && st.homework.rate < 0.6 ? 'rate-low' : ''}">${pct(st.homework.rate)}</td>
+        <td>${rs.length ? st.points : '-'}</td><td>${st.avgMinutes == null ? '-' : st.avgMinutes + '분'}</td>
+        <td>${esc(st.errors.slice(0, 2).map(([t, n]) => `${t} ${n}`).join(', ') || '-')}</td>
+        <td>${last ? `${esc(last.stage)} <span class="muted">${md(last.date)}~</span>` : '-'}</td></tr>`;
+    }).join('') : '<tr><td colspan="9" class="empty">해당하는 학생이 없습니다.</td></tr>';
+  }
+  $('sum-group').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-group]');
+    if (!b) return;
+    S.sumGroup = b.dataset.group;
+    renderSummary();
+  });
+
+  async function exportAll(kind) {
+    busy('내보내기 파일 만드는 중…');
+    try {
+      const r = await run('api_export', kind);
+      $('export-result').innerHTML = `<div class="notice ok" style="margin-top:10px">✓ <b>${esc(r.name)}</b>을(를) 만들었습니다.
+        <div class="row" style="margin-top:6px"><a class="btn small" href="${esc(r.url)}" target="_blank">파일 열기</a>
+        <a class="btn small" href="${esc(r.folderUrl)}" target="_blank">폴더 열기</a></div></div>`;
+    } catch (e) {
+      $('export-result').innerHTML = `<div class="notice err" style="margin-top:10px">내보내기에 실패했습니다. ${esc(e.message)}</div>`;
+    } finally {
+      idle();
+    }
+  }
+  $('export-csv').addEventListener('click', () => exportAll('csv'));
+  $('export-xlsx').addEventListener('click', () => exportAll('xlsx'));
 
   /* ---------- 설정 ---------- */
   function renderSettings() {

@@ -181,3 +181,29 @@ test('번호 변경: 이미 쓰는 번호, 겹치는 날짜, 형식 오류는 �
   assert.throws(() => g.ctx.api_changeNo({ from: '56', to: '73' }), /날짜가 겹칩니다: 2026-10-09/);
   assert.equal(g.ss.getSheetByName('수업기록').objects()[0].학생번호, '56');
 });
+
+test('2단계: 기록 읽기, 명단 추가·수정, 내보내기', () => {
+  const g = fresh();
+  register(g);
+  g.ctx.api_save({ cards: pendingCards(g), skips: [] });
+  const recs = plain(g.ctx.api_records());
+  assert.equal(recs.length, 3);
+  assert.equal(recs[0].학생번호, '56');
+  assert.equal(recs[0].확인필요상태, '해결');
+
+  plain(g.ctx.api_saveStudent({ isNew: true, no: '56', name: '김도윤', grade: '초4', level: '기본+유형', group: 'A' }));
+  assert.throws(() => g.ctx.api_saveStudent({ isNew: true, no: '56', name: '다른학생' }), /이미 김도윤/);
+  assert.throws(() => g.ctx.api_saveStudent({ no: '56', name: '김도윤', level: '심화' }), /디딤돌 레벨/);
+  const roster = plain(g.ctx.api_saveStudent({ no: '56', name: '김도윤', grade: '초5', level: '기본+응용', group: 'B', status: '재원', memo: '메모' }));
+  assert.deepEqual(roster.map((s) => [s.no, s.grade, s.level, s.group, s.memo]), [['56', '초5', '기본+응용', 'B', '메모']]);
+
+  const csv = plain(g.ctx.api_export('csv'));
+  assert.match(csv.name, /^진도카드_수업기록_\d{8}-\d{4}\.csv$/);
+  const folder = g.root.folders.find((f) => f.getName() === '진도카드 내보내기');
+  const text = folder.files[0].getBlob().getDataAsString();
+  assert.ok(text.startsWith('﻿기록ID,수업일,학생번호'));
+  assert.equal(C.parseCsv(text).length, 4);
+  const x = plain(g.ctx.api_export('xlsx'));
+  assert.match(x.name, /\.xlsx$/);
+  assert.equal(folder.files.length, 2);
+});
