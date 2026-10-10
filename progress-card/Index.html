@@ -14,6 +14,9 @@
   <nav id="tabs">
     <button data-tab="upload" class="active">업로드</button>
     <button data-tab="review">확인<span id="review-count" class="count hidden"></span></button>
+    <button data-tab="student">학생</button>
+    <button data-tab="day">날짜</button>
+    <button data-tab="summary">집계</button>
     <button data-tab="roster">명단</button>
     <button data-tab="settings">설정</button>
   </nav>
@@ -45,6 +48,60 @@
     <div id="savebar" class="savebar hidden"></div>
   </section>
 
+  <!-- 학생별 -->
+  <section id="tab-student" class="hidden">
+    <div class="card">
+      <div class="row nowrap">
+        <select id="stu-select" aria-label="학생"></select>
+        <button class="btn small reload-btn" title="시트에서 다시 불러오기">새로고침</button>
+      </div>
+      <div data-period></div>
+    </div>
+    <div id="stu-summary"></div>
+    <div id="stu-timeline"></div>
+  </section>
+
+  <!-- 날짜별 -->
+  <section id="tab-day" class="hidden">
+    <div class="card">
+      <div class="row nowrap">
+        <button class="btn" id="day-prev" aria-label="이전 수업일">←</button>
+        <input type="date" id="day-input" class="date-input">
+        <button class="btn" id="day-next" aria-label="다음 수업일">→</button>
+        <button class="btn small reload-btn">새로고침</button>
+      </div>
+      <div id="day-recent" class="chips" style="margin-top:10px"></div>
+    </div>
+    <div id="day-list"></div>
+  </section>
+
+  <!-- 기간 집계 -->
+  <section id="tab-summary" class="hidden">
+    <div class="card">
+      <div data-period></div>
+      <div class="row" style="margin-top:10px">
+        <div class="seg" id="sum-group"></div>
+        <button class="btn small reload-btn">새로고침</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table class="sum-table">
+        <thead><tr><th>번호</th><th>이름</th><th>레벨·조</th><th>수업<br><span class="muted">정규·보강·결강</span></th><th>과제<br>완료율</th><th>포인트</th><th>평균<br>시간</th><th>오답 원인</th><th>최근 단계</th></tr></thead>
+        <tbody id="sum-body"></tbody>
+      </table></div>
+      <p class="muted">줄을 누르면 그 학생의 타임라인으로 갑니다.</p>
+    </div>
+    <div class="card">
+      <h2>전체 기록 내보내기</h2>
+      <p class="muted">구글 드라이브 <b>진도카드 내보내기</b> 폴더에 파일을 만들고 링크를 보여 줍니다.</p>
+      <div class="row">
+        <button class="btn" id="export-csv">CSV (수업기록)</button>
+        <button class="btn" id="export-xlsx">엑셀 (전체 탭)</button>
+      </div>
+      <div id="export-result"></div>
+    </div>
+  </section>
+
   <!-- 명단 -->
   <section id="tab-roster" class="hidden">
     <div class="card">
@@ -62,10 +119,13 @@
       <div id="roster-diff"></div>
     </div>
     <div class="card">
-      <h2>학생 명단 <span id="roster-count" class="muted"></span></h2>
-      <p class="muted">디딤돌 레벨·발송 조는 지금은 구글 시트의 <b>학생명단</b> 탭에서 직접 입력해 주세요. (2단계에서 이 화면에서 고칠 수 있게 합니다)</p>
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">학생 명단 <span id="roster-count" class="muted"></span></h2>
+        <button class="btn small" id="stu-add">＋ 학생 추가</button>
+      </div>
+      <p class="muted">[수정]에서 디딤돌 레벨·발송 조·상태·메모를 고칩니다. 이름·학년은 결제일 관리에서 불러올 때 그쪽 값으로 바뀝니다.</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>번호</th><th>이름</th><th>학년</th><th>디딤돌 레벨</th><th>발송 조</th><th>상태</th><th></th></tr></thead>
+        <thead><tr><th>번호</th><th>이름</th><th>학년</th><th>디딤돌 레벨</th><th>발송 조</th><th>상태</th><th>메모</th><th></th></tr></thead>
         <tbody id="roster-body"></tbody>
       </table></div>
     </div>
