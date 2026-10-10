@@ -51,10 +51,14 @@ const EXPORT_FOLDER_NAME = '진도카드 내보내기';
 
 /* ---------- 웹 앱 ---------- */
 
+// 브라우저 탭 아이콘 (GitHub Pages에 올라간 이미지)
+const FAVICON_URL = 'https://zieum2456-cell.github.io/jieummath/icons/progress-card-64.png';
+
 function doGet() {
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle('진도 카드')
+    .setFaviconUrl(FAVICON_URL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
