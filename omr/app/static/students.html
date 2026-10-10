@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>학생 명단</title>
+<link rel="stylesheet" href="/static/app.css?v=1">
+</head>
+<body>
+<nav class="top">
+  <span class="brand">진도 카드</span>
+  <a href="/">촬영</a>
+  <a href="/review">확인 <span class="badge" id="pending-badge"></span></a>
+  <a href="/students" class="on">명단</a>
+</nav>
+<main>
+  <h1>학생 명단</h1>
+  <form class="panel" id="form">
+    <h2 id="form-title">학생 추가</h2>
+    <div class="form-grid">
+      <label>번호<input name="number" type="number" inputmode="numeric" min="0" max="99" required></label>
+      <label>이름<input name="name" type="text" required></label>
+      <label>학년<select name="grade"></select></label>
+      <label>디딤돌 레벨<select name="didimdol_level">
+        <option value="">-</option><option>기본</option><option>기본+유형</option><option>기본+응용</option>
+      </select></label>
+      <label>발송 조<select name="send_group"><option value="">-</option><option>A</option><option>B</option></select></label>
+      <label>메모<input name="memo" type="text"></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="row" style="gap:6px"><input name="active" type="checkbox" checked style="width:20px;height:20px"> 재원 중</label>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" id="cancel" hidden>취소</button>
+      <button class="btn primary" id="submit">추가</button>
+    </div>
+  </form>
+  <div class="panel" style="padding:0;overflow-x:auto;margin-top:12px">
+    <table class="list">
+      <thead><tr><th>번호</th><th>이름</th><th>학년</th><th>디딤돌</th><th>조</th><th>메모</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+<script src="/static/common.js?v=1"></script>
+<script>
+const GRADES = ["", "초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"];
+const form = document.querySelector("#form");
+form.grade.replaceChildren(...GRADES.map((g) => el("option", { value: g }, g || "-")));
+let editing = null;
+
+async function load() {
+  const list = await api("/api/students");
+  document.querySelector("#rows").replaceChildren(...list.map((s) => el("tr", { class: s.active ? "" : "inactive" },
+    el("td", {}, s.number), el("td", {}, s.name, s.active ? "" : " (재원 아님)"), el("td", {}, s.grade || ""),
+    el("td", {}, s.didimdol_level || ""), el("td", {}, s.send_group || ""), el("td", { class: "small" }, s.memo || ""),
+    el("td", { style: "white-space:nowrap" },
+      el("button", { class: "btn", onclick: () => edit(s) }, "수정"), " ",
+      el("button", { class: "btn danger", onclick: () => remove(s) }, "삭제")))));
+  if (!list.length) document.querySelector("#rows").append(el("tr", {}, el("td", { colspan: 7, class: "empty" }, "등록된 학생이 없습니다.")));
+}
+
+function edit(s) {
+  editing = s.id;
+  for (const k of ["number", "name", "grade", "didimdol_level", "send_group", "memo"]) form[k].value = s[k] ?? "";
+  form.active.checked = !!s.active;
+  document.querySelector("#form-title").textContent = `${s.number}번 ${s.name} 수정`;
+  document.querySelector("#submit").textContent = "저장";
+  document.querySelector("#cancel").hidden = false;
+  form.scrollIntoView({ behavior: "smooth" });
+}
+
+function reset() {
+  editing = null;
+  form.reset();
+  document.querySelector("#form-title").textContent = "학생 추가";
+  document.querySelector("#submit").textContent = "추가";
+  document.querySelector("#cancel").hidden = true;
+}
+
+async function remove(s) {
+  const ok = await ask(`${s.number}번 ${s.name} 학생을 삭제할까요?`, [
+    { label: "취소", value: false }, { label: "삭제", value: true, cls: "primary" }]);
+  if (!ok) return;
+  try { await api(`/api/students/${s.id}`, { method: "DELETE" }); load(); }
+  catch (e) { toast(e.message, 4000); }
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(form));
+  data.active = form.active.checked;
+  try {
+    if (editing) await api(`/api/students/${editing}`, { method: "PUT", json: data });
+    else await api("/api/students", { json: data });
+    toast("저장했습니다");
+    reset();
+    load();
+    form.number.focus();
+  } catch (err) { toast(err.message, 4000); }
+});
+document.querySelector("#cancel").addEventListener("click", reset);
+load();
+refreshPendingBadge();
+</script>
+</body>
+</html>

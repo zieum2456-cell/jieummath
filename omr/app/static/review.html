@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>진도 카드 확인</title>
+<link rel="stylesheet" href="/static/app.css?v=1">
+</head>
+<body>
+<nav class="top">
+  <span class="brand">진도 카드</span>
+  <a href="/">촬영</a>
+  <a href="/review" class="on">확인 <span class="badge" id="pending-badge"></span></a>
+  <a href="/students">명단</a>
+</nav>
+<main>
+  <div class="row" style="justify-content:space-between">
+    <h1 id="title">판독 확인</h1>
+    <select id="status-filter" style="width:auto">
+      <option value="pending">확인 대기</option>
+      <option value="saved">저장됨</option>
+      <option value="discarded">버린 카드</option>
+    </select>
+  </div>
+  <div class="card-strip" id="strip"></div>
+  <div id="content"></div>
+</main>
+<div class="zoom" id="zoom"><img alt="카드 확대"></div>
+<script src="/static/common.js?v=1"></script>
+<script src="/static/review.js?v=1"></script>
+</body>
+</html>

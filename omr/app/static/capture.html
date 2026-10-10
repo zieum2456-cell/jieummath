@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="진도 카드">
+<title>진도 카드 촬영</title>
+<link rel="stylesheet" href="/static/app.css?v=1">
+</head>
+<body>
+<nav class="top">
+  <span class="brand">진도 카드</span>
+  <a href="/" class="on">촬영</a>
+  <a href="/review">확인 <span class="badge" id="pending-badge"></span></a>
+  <a href="/students">명단</a>
+</nav>
+<main class="narrow">
+  <div class="notice" id="ai-notice"></div>
+
+  <div class="panel" style="margin-top:12px">
+    <label class="btn primary big" for="camera">📷 카드 촬영</label>
+    <input id="camera" class="file-hidden" type="file" accept="image/*" capture="environment">
+    <div class="row" style="margin-top:10px">
+      <label class="btn" for="album" style="flex:1">🖼️ 앨범에서 선택</label>
+      <input id="album" class="file-hidden" type="file" accept="image/*,.heic,.heif,.pdf" multiple>
+      <a class="btn" href="/review" style="flex:1">확인하러 가기 →</a>
+    </div>
+    <p class="muted small" style="margin:10px 0 0">
+      한 장에 카드 여러 장(최대 8장)을 찍어도 됩니다. 네 모서리 검은 사각형이 모두 보이게 찍어 주세요.
+      찍고 나면 바로 올라가고, 다시 <b>카드 촬영</b>을 누르면 다음 장을 찍을 수 있습니다.
+    </p>
+  </div>
+
+  <ul class="uploads" id="uploads"></ul>
+</main>
+<script src="/static/common.js?v=1"></script>
+<script>
+const list = document.querySelector("#uploads");
+const queue = [];
+let busy = false;
+
+function addFiles(files) {
+  for (const f of files) {
+    const thumb = el("img", { alt: "" });
+    // HEIC은 사파리에서 미리보기가 안 될 수 있어 실패하면 숨긴다
+    thumb.onerror = () => { thumb.style.visibility = "hidden"; };
+    thumb.src = URL.createObjectURL(f);
+    const msg = el("div", { class: "msg" }, "올리는 중…");
+    const sub = el("div", { class: "muted small" }, f.name || "사진");
+    const li = el("li", {}, thumb, el("div", {}, msg, sub));
+    list.prepend(li);
+    queue.push({ file: f, li, msg, sub });
+  }
+  pump();
+}
+
+async function pump() {
+  if (busy) return;
+  busy = true;
+  while (queue.length) {
+    const job = queue.shift();
+    const fd = new FormData();
+    fd.append("files", job.file, job.file.name || "photo.jpg");
+    try {
+      const [r] = await api("/api/upload", { method: "POST", body: fd });
+      if (r.error) throw new Error(r.error);
+      if (r.total === 0) {
+        job.li.className = "err";
+        job.msg.textContent = "카드를 찾지 못했습니다 — 다시 찍어 주세요";
+        job.sub.textContent = "네 모서리 검은 사각형이 모두 보이게, 너무 비스듬하지 않게 찍어 주세요.";
+      } else if (r.found < r.total) {
+        job.li.className = "warn";
+        job.msg.textContent = `카드 ${r.total}장 중 ${r.found}장 인식`;
+        job.sub.textContent = `${r.total - r.found}장은 기준점이 다 잡히지 않았습니다. 그 카드만 다시 찍어 주세요.`;
+      } else {
+        job.li.className = "ok";
+        job.msg.textContent = `카드 ${r.total}장 중 ${r.found}장 인식 ✓`;
+        job.sub.textContent = "모두 인식했습니다.";
+      }
+    } catch (e) {
+      job.li.className = "err";
+      job.msg.textContent = "올리지 못했습니다";
+      job.sub.textContent = e.message;
+    }
+    refreshPendingBadge();
+  }
+  busy = false;
+}
+
+for (const id of ["camera", "album"]) {
+  const input = document.getElementById(id);
+  input.addEventListener("change", () => {
+    if (input.files.length) addFiles([...input.files]);
+    input.value = ""; // 같은 버튼을 바로 다시 누를 수 있게
+  });
+}
+
+refreshPendingBadge().then((s) => {
+  const n = document.querySelector("#ai-notice");
+  if (s && !s.ai_enabled) n.textContent = "Claude API 키가 설정되지 않아 손글씨는 판독하지 않습니다. OMR 칸만 읽고, 손글씨는 확인 화면에서 직접 입력합니다.";
+  else if (s && s.students === 0) n.innerHTML = "학생 명단이 비어 있습니다. <a href='/students'>명단</a>에서 학생을 먼저 등록하면 번호·이름 확인이 됩니다.";
+});
+</script>
+</body>
+</html>
