@@ -1,0 +1,305 @@
+<script>
+/*
+ * 진도 카드 CSV 해석 · 형식 검사 · 명단 비교 (순수 로직: 화면·서버와 무관)
+ * 브라우저에서는 window.Core, Node 테스트에서는 tests/load-core.js로 불러 쓴다.
+ */
+(function (root) {
+  'use strict';
+
+  const HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '오답원인', '추가포인트',
+    '지난과제범위', '오늘진도범위', '추가포인트범위', '오늘과제', '학습태도', '확인필요'];
+
+  const ENUMS = {
+    출결: ['정규', '결강', '보강'],
+    지난과제: ['완료', '미완', '안 함', '두고 옴', '과제 없음'],
+    단계: ['개념', '유형', '단원마무리', '교재오답', 'Test', '경시'],
+    진행률: ['50% 미만', '50~75%', '75~100%'],
+    오답원인: ['계산 실수', '개념 이해 부족', '조건 놓침', '풀이 과정 생략'],
+    추가포인트: ['0', '3', '6', '9'],
+  };
+  const MULTI = ['단계', '오답원인'];
+  const RANGE_COLS = ['지난과제범위', '오늘진도범위', '추가포인트범위', '오늘과제'];
+  const BOOKS = ['디딤돌', '자료집', '문장제', '교재오답', '교재오답-자료집', '단원Test', '주간Test', '경시'];
+  const MARKS = { '○': '끝냄', '△': '하다 멈춤', '': '아직 안 함' };
+  // 결강 카드는 비어 있어도 되는 칸
+  const ABSENT_OPTIONAL = ['등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '추가포인트'];
+
+  const nfc = (s) => String(s == null ? '' : s).normalize('NFC');
+  const splitList = (s) => String(s || '').split(';').map((x) => x.trim()).filter(Boolean);
+
+  // 긴 교재명부터 맞춰 본다 (교재오답-자료집이 교재오답으로 잘리지 않게)
+  const RANGE_RE = new RegExp('^(' + [...BOOKS].sort((a, b) => b.length - a.length).map((b) => b.replace(/[-]/g, '\\-')).join('|')
+    + ')(?:\\(([^()]*)\\))?\\[([^\\[\\]]*)\\]([○△])?$');
+
+  /** 범위 항목 하나: 교재명(단원)[범위]표시 → { raw, ok, book, unit, range, mark } */
+  function parseRangeItem(raw) {
+    const text = String(raw).trim();
+    const m = text.match(RANGE_RE);
+    if (!m) return { raw: text, ok: false };
+    return { raw: text, ok: true, book: m[1], unit: m[2] || '', range: m[3], mark: m[4] || '' };
+  }
+
+  const parseRangeList = (s) => splitList(s).map(parseRangeItem);
+
+  /** CSV 텍스트 → [{ rowNo, cells }] (rowNo: 표로 열었을 때 몇 번째 행인지, 제목 줄이 1. 빈 줄도 센다) */
+  function parseCsv(text) {
+    const src = String(text).replace(/^﻿/, '');
+    const recs = [];
+    let row = [];
+    let field = '';
+    let quoted = false;
+    let rowNo = 1;
+    const end = () => {
+      row.push(field);
+      recs.push({ rowNo: rowNo++, cells: row });
+      row = [];
+      field = '';
+    };
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (quoted) {
+        if (c === '"') {
+          if (src[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else quoted = false;
+        } else field += c;
+      } else if (c === '"') quoted = true;
+      else if (c === ',') {
+        row.push(field);
+        field = '';
+      } else if (c === '\r' || c === '\n') {
+        if (c === '\r' && src[i + 1] === '\n') i++;
+        end();
+      } else field += c;
+    }
+    if (field !== '' || row.length) end();
+    return recs.filter((r) => r.cells.some((v) => v.trim() !== ''));
+  }
+
+  /** 파일 하나 읽기 → { fileName, fileDate, headerErrors, cards: [{ rowNo, cellCount, values }] } */
+  function readCsv(fileName, text) {
+    const name = nfc(fileName);
+    const m = name.match(/(\d{4})(\d{2})(\d{2})/);
+    const res = { fileName: name, fileDate: m ? `${m[1]}-${m[2]}-${m[3]}` : '', headerErrors: [], cards: [] };
+    const recs = parseCsv(nfc(text));
+    if (!recs.length) {
+      res.headerErrors.push('파일이 비어 있습니다.');
+      return res;
+    }
+    const head = recs[0].cells.map((s) => s.trim());
+    for (let i = 0; i < Math.max(head.length, HEADERS.length); i++) {
+      if (head[i] === HEADERS[i]) continue;
+      const got = head[i] == null ? '(없음)' : `"${head[i]}"`;
+      const want = HEADERS[i] == null ? '(이 열은 없어야 함)' : `"${HEADERS[i]}"`;
+      res.headerErrors.push(`${i + 1}번째 열 이름이 ${got}입니다. 올바른 이름: ${want}`);
+    }
+    if (res.headerErrors.length && head.length === HEADERS.length && [...head].sort().join() === [...HEADERS].sort().join()) {
+      res.headerErrors.unshift('열 이름은 모두 있지만 순서가 다릅니다.');
+    }
+    if (res.headerErrors.length) return res;
+    res.cards = recs.slice(1).map((r) => {
+      const values = {};
+      HEADERS.forEach((h, i) => (values[h] = (r.cells[i] == null ? '' : r.cells[i]).trim()));
+      return { rowNo: r.rowNo, cellCount: r.cells.length, values };
+    });
+    if (!res.cards.length) res.headerErrors.push('카드(제목 줄 아래 행)가 없습니다.');
+    return res;
+  }
+
+  function validDate(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) return false;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+  }
+
+  function timeToMin(s) {
+    const m = /^(\d{2}):(\d{2})$/.exec(s);
+    if (!m || +m[1] > 23 || +m[2] > 59) return null;
+    return +m[1] * 60 + +m[2];
+  }
+
+  /** 카드 손글씨 이름(성 없이 쓰기도 함)과 명단 이름(성 포함)이 같은 사람인지 */
+  function nameMatches(a, b) {
+    const x = nfc(a).replace(/\s/g, '');
+    const y = nfc(b).replace(/\s/g, '');
+    if (!x || !y) return false;
+    const strip = (s, t) => s.slice(1) === t || (s.length >= 4 && s.slice(2) === t); // 성 1자 / 2자(남궁 등)
+    return x === y || strip(y, x) || strip(x, y);
+  }
+
+  const cardKey = (v) => `${v.수업일}_${v.학생번호}`;
+
+  /**
+   * 카드 한 장 검사 → [{ field, level: 'error'|'warn', msg }]
+   * field가 '_'로 시작하면 특정 칸이 아닌 카드 전체 문제.
+   * ctx: { roster: [{no,name,status}], existing: 같은 학생·날짜의 저장된 기록(있으면), batchCount: 같은 업로드 안 같은 키 개수, fileDate, cellsOk }
+   */
+  function validateCard(values, ctx) {
+    ctx = ctx || {};
+    const v = values;
+    const out = [];
+    const err = (field, msg) => out.push({ field, level: 'error', msg });
+    const warn = (field, msg) => out.push({ field, level: 'warn', msg });
+    const absent = v.출결 === '결강';
+    const empty = (f) => !String(v[f] || '').trim();
+
+    if (ctx.cellCount != null && ctx.cellCount !== HEADERS.length && !ctx.cellsOk) {
+      err('_cells', `이 행은 칸이 ${ctx.cellCount}개입니다(18개여야 함). 쉼표가 빠지거나 더 들어가 값이 밀렸을 수 있습니다. 각 칸 값을 확인한 뒤 [칸 위치 확인함]을 누르세요.`);
+    }
+
+    if (empty('수업일')) err('수업일', '비어 있습니다.');
+    else if (!validDate(v.수업일)) err('수업일', 'YYYY-MM-DD 형식의 날짜여야 합니다. (예: 2026-10-09)');
+    else if (ctx.fileDate && ctx.fileDate !== v.수업일) warn('수업일', `파일 이름의 날짜(${ctx.fileDate})와 다릅니다.`);
+
+    if (empty('학생번호')) err('학생번호', '비어 있습니다.');
+    else if (/^\d$/.test(v.학생번호)) err('학생번호', `두 자리여야 합니다. 0${v.학생번호}번이 맞으면 "0${v.학생번호}"로 고쳐 주세요.`);
+    else if (!/^\d{2}$/.test(v.학생번호)) err('학생번호', '숫자 두 자리여야 합니다.');
+
+    if (empty('이름')) err('이름', '비어 있습니다.');
+
+    if (empty('출결')) err('출결', '비어 있습니다.');
+    else if (!ENUMS.출결.includes(v.출결)) err('출결', `"${v.출결}"은(는) 목록에 없는 값입니다. (${ENUMS.출결.join(' / ')})`);
+
+    const need = (f) => {
+      if (!empty(f)) return true;
+      if (!(absent && ABSENT_OPTIONAL.includes(f))) err(f, '비어 있습니다.');
+      return false;
+    };
+
+    ['지난과제', '진행률', '추가포인트'].forEach((f) => {
+      if (need(f) && !ENUMS[f].includes(v[f])) err(f, `"${v[f]}"은(는) 목록에 없는 값입니다. (${ENUMS[f].join(' / ')})`);
+    });
+
+    MULTI.forEach((f) => {
+      const tokens = splitList(v[f]);
+      if (!tokens.length) {
+        if (f === '단계') need(f);
+        return;
+      }
+      const bad = tokens.filter((t) => !ENUMS[f].includes(t));
+      if (bad.length) err(f, `목록에 없는 값: ${bad.map((b) => `"${b}"`).join(', ')} (${ENUMS[f].join(' / ')} 중에서 "; "로 구분)`);
+      if (new Set(tokens).size !== tokens.length) warn(f, '같은 값이 두 번 들어 있습니다.');
+    });
+
+    const times = {};
+    ['등원', '하원'].forEach((f) => {
+      if (!need(f)) return;
+      times[f] = timeToMin(v[f]);
+      if (times[f] == null) err(f, 'HH:MM 형식(24시간제)이어야 합니다. (예: 16:55)');
+    });
+    let minutes = null;
+    if (need('수업시간(분)')) {
+      if (/^\d+$/.test(v['수업시간(분)'])) minutes = Number(v['수업시간(분)']);
+      else err('수업시간(분)', '정수(분)여야 합니다.');
+    }
+    if (times.등원 != null && times.하원 != null) {
+      const diff = times.하원 - times.등원;
+      if (diff <= 0) err('하원', '하원 시각이 등원 시각보다 빠르거나 같습니다.');
+      else if (minutes != null && diff !== minutes) {
+        warn('수업시간(분)', `등원·하원 차이는 ${diff}분인데 수업시간은 ${minutes}분입니다.`);
+      }
+    }
+
+    if (v.지난과제 === '과제 없음' && !empty('지난과제범위')) warn('지난과제범위', '지난과제가 "과제 없음"인데 지난과제범위가 있습니다.');
+
+    RANGE_COLS.forEach((f) => {
+      const bad = parseRangeList(v[f]).filter((x) => !x.ok);
+      if (bad.length) {
+        warn(f, `형식이 맞지 않는 항목: ${bad.map((b) => `"${b.raw}"`).join(', ')} — 교재명(단원)[범위]표시 형식이 아니라 원문 그대로 보존합니다.`);
+      }
+    });
+
+    if (ctx.roster && /^\d{2}$/.test(v.학생번호)) {
+      const r = ctx.roster.find((s) => s.no === v.학생번호);
+      if (!r) {
+        const same = ctx.roster.filter((s) => nameMatches(v.이름, s.name));
+        warn('학생번호', `명단에 ${v.학생번호}번 학생이 없습니다.`
+          + (same.length ? ` 이름이 같은 학생: ${same.map((s) => `${s.no}번 ${s.name}`).join(', ')}` : ''));
+      } else if (!nameMatches(v.이름, r.name)) {
+        warn('이름', `명단의 ${r.no}번은 "${r.name}"입니다.`);
+      } else if (r.status === '퇴원') {
+        warn('학생번호', `명단에 퇴원으로 표시된 학생입니다(${r.no}번 ${r.name}).`);
+      }
+    }
+
+    if (ctx.batchCount > 1) err('_batch', `이번 업로드에 같은 학생·같은 날짜 카드가 ${ctx.batchCount}장 있습니다. 한 장만 남기고 나머지는 [저장 안 함]으로 바꾸세요.`);
+    if (ctx.existing) warn('_dup', '같은 학생·같은 날짜 기록이 이미 저장돼 있습니다. 덮어쓸지 건너뛸지 고르세요.');
+
+    return out;
+  }
+
+  /** 저장할 값으로 정리: 여러 개 고르는 칸은 "; "로 다시 이어 붙인다 */
+  function canonical(values) {
+    const out = {};
+    HEADERS.forEach((h) => {
+      const s = String(values[h] == null ? '' : values[h]).trim();
+      out[h] = MULTI.includes(h) ? splitList(s).join('; ') : s;
+    });
+    return out;
+  }
+
+  /** 확인 화면 정렬 순위: 확인필요 → 오류 → 경고 → 문제없음 */
+  function rankOf(values, issues) {
+    if (String(values.확인필요 || '').trim()) return 0;
+    if (issues.some((x) => x.level === 'error')) return 1;
+    if (issues.length) return 2;
+    return 3;
+  }
+
+  /* ---------- 명단 ---------- */
+
+  /** 학생번호 입력값 정리: '5' → '05', 형식이 틀리면 null */
+  function normalizeNo(input) {
+    const s = String(input == null ? '' : input).trim();
+    return /^\d{1,2}$/.test(s) ? s.padStart(2, '0') : null;
+  }
+
+  /** 붙여넣은 명단 텍스트(번호 이름 학년, 탭·쉼표·공백 구분) → { list, invalid } */
+  function parseRosterText(text) {
+    const list = [];
+    const invalid = [];
+    String(text || '').split(/\r?\n/).forEach((line, i) => {
+      const t = nfc(line).trim();
+      if (!t) return;
+      const parts = t.split(/\t|,|\s{1,}/).map((s) => s.trim()).filter(Boolean);
+      const no = normalizeNo(parts[0]);
+      if (no == null || !parts[1]) return invalid.push({ line: i + 1, text: t, reason: '번호(숫자 두 자리)와 이름이 필요합니다.' });
+      if (list.some((s) => s.no === no)) return invalid.push({ line: i + 1, text: t, reason: `${no}번이 두 번 들어 있습니다.` });
+      list.push({ no, name: parts[1], grade: parts[2] || '' });
+    });
+    return { list, invalid };
+  }
+
+  /**
+   * 지금 명단(current)과 불러온 명단(incoming) 비교
+   * → { add, update: [{ no, from, to }], missing, same }
+   *  - 학년은 불러온 쪽에 값이 있을 때만 바꾼다
+   *  - 퇴원으로 표시된 학생이 다시 나오면 재원으로 되돌린다(update)
+   */
+  function diffRoster(current, incoming) {
+    const add = [];
+    const update = [];
+    let same = 0;
+    incoming.forEach((s) => {
+      const c = current.find((x) => x.no === s.no);
+      if (!c) return add.push({ no: s.no, name: s.name, grade: s.grade || '' });
+      const to = { name: s.name, grade: s.grade || c.grade || '', status: '재원' };
+      const from = { name: c.name, grade: c.grade || '', status: c.status || '재원' };
+      if (to.name !== from.name || to.grade !== from.grade || to.status !== from.status) update.push({ no: s.no, from, to });
+      else same++;
+    });
+    const missing = current.filter((c) => c.status !== '퇴원' && !incoming.some((s) => s.no === c.no)).map((c) => ({ no: c.no, name: c.name }));
+    return { add, update, missing, same };
+  }
+
+  const api = {
+    HEADERS, ENUMS, MULTI, RANGE_COLS, BOOKS, MARKS,
+    nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
+    validateCard, canonical, rankOf, normalizeNo, parseRosterText, diffRoster,
+  };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.Core = api;
+})(typeof self !== 'undefined' ? self : this);
+</script>

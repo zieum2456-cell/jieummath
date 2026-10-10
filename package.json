@@ -4,6 +4,6 @@
   "private": true,
   "description": "학생 결제일 체크 및 결제 안내 메시지 작성",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js progress-card/tests/*.test.js"
   }
 }

@@ -6,6 +6,7 @@
  *
  * student = {
  *   id, name,
+ *   no: '56',                // 학생번호 (숫자 두 자리, 진도 카드와 연결하는 번호, 없으면 '')
  *   grade: '중1',            // 학년 (GRADES 중 하나, 없으면 '')
  *   minutes: 120,            // 회당 수업시간(분)
  *   cycle: 12 | 8,           // 결제 기준 회차
@@ -257,6 +258,29 @@
     };
   }
 
+  /**
+   * 학생번호 입력값 정리: 숫자 1~2자리 → 두 자리 문자열 ('5' → '05'), 빈칸 → ''
+   * 형식이 틀리면 null
+   */
+  function normalizeNo(input) {
+    const v = String(input ?? '').trim();
+    if (!v) return '';
+    if (!/^\d{1,2}$/.test(v)) return null;
+    return v.padStart(2, '0');
+  }
+
+  /**
+   * 진도 카드 앱으로 보낼 명단 텍스트 (한 줄에 한 명: 번호<탭>이름<탭>학년)
+   * 학생번호가 없는 학생은 빼고, 번호 순으로 정렬한다.
+   */
+  function rosterText(students) {
+    return students
+      .filter((s) => s.no)
+      .sort((a, b) => a.no.localeCompare(b.no))
+      .map((s) => [s.no, s.name, s.grade || ''].join('\t'))
+      .join('\n');
+  }
+
   /** 직전 결제 완료 처리 취소 */
   function undoAdvance(student) {
     const history = [...(student.history || [])];
@@ -285,5 +309,7 @@
     buildMessage,
     advance,
     undoAdvance,
+    normalizeNo,
+    rosterText,
   };
 });

@@ -129,3 +129,20 @@ test('전체 휴강에서 제외된 학생은 정상 수업', () => {
   assert.equal(P.computeCycle(s, holidays).lastDate, '2026-10-28');
   assert.equal(P.computeCycle({ ...s, id: 'lee' }, holidays).lastDate, '2026-11-02');
 });
+
+test('학생번호 정리: 한 자리는 앞에 0을 붙이고, 숫자가 아니면 null', () => {
+  assert.equal(P.normalizeNo(''), '');
+  assert.equal(P.normalizeNo(' 5 '), '05');
+  assert.equal(P.normalizeNo('56'), '56');
+  assert.equal(P.normalizeNo('123'), null);
+  assert.equal(P.normalizeNo('5a'), null);
+});
+
+test('진도카드용 명단 텍스트: 번호 순, 번호 없는 학생 제외', () => {
+  const students = [
+    { no: '56', name: '김도윤', grade: '초4' },
+    { no: '', name: '이번호없음', grade: '초5' },
+    { no: '07', name: '박지아' },
+  ];
+  assert.equal(P.rosterText(students), '07\t박지아\t\n56\t김도윤\t초4');
+});
