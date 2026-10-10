@@ -149,3 +149,35 @@ test('명단: Firebase 읽기 실패 시 이유를 알려 준다', () => {
   assert.throws(() => g.ctx.api_fetchPaymentRoster(), /403 \/ 403.*Permission denied/);
   assert.equal(g.fetchLog.length, 2); // 헤더 있이 한 번, 없이 한 번
 });
+
+test('번호 변경: 명단과 수업기록(학생번호·기록ID)을 함께 바꾼다', () => {
+  const g = fresh();
+  g.ctx.api_applyRoster({ add: [{ no: '56', name: '김도윤', grade: '초4' }, { no: '43', name: '이지아', grade: '초5' }], update: [], retire: [] });
+  register(g);
+  g.ctx.api_save({ cards: pendingCards(g), skips: [] });
+  const plan = plain(g.ctx.api_changeNo({ from: '56', to: '57', dryRun: true }));
+  assert.equal(plan.count, 1);
+  assert.equal(g.ss.getSheetByName('수업기록').objects()[0].학생번호, '56'); // 미리 보기는 바꾸지 않음
+  const r = plain(g.ctx.api_changeNo({ from: '56', to: '57' }));
+  assert.deepEqual(r.roster.map((s) => s.no), ['57', '43']);
+  assert.match(r.roster[0].memo, /56번에서 57번으로 변경\(기록 1건\)/);
+  const rec = g.ss.getSheetByName('수업기록').objects();
+  assert.deepEqual(rec.map((x) => [x.기록ID, x.학생번호]), [['2026-10-09_57', '57'], ['2026-10-09_43', '43'], ['2026-10-09_73', '73']]);
+  assert.ok(rec[0].수정일시);
+  assert.equal(rec[1].수정일시, '');
+  assert.equal(rec[0].학습태도, '서술형 풀이 첫 단어/문장 제시하면 스스로 작성 가능'); // 다른 칸은 그대로
+});
+
+test('번호 변경: 이미 쓰는 번호, 겹치는 날짜, 형식 오류는 막는다', () => {
+  const g = fresh();
+  g.ctx.api_applyRoster({ add: [{ no: '56', name: '김도윤' }, { no: '43', name: '이지아' }], update: [], retire: [] });
+  g.ctx.api_applyRoster({ add: [], update: [], retire: ['43'] });
+  assert.throws(() => g.ctx.api_changeNo({ from: '56', to: '43' }), /이지아\(퇴원\) 학생이 쓰고 있습니다/);
+  assert.throws(() => g.ctx.api_changeNo({ from: '56', to: '5' }), /두 자리/);
+  assert.throws(() => g.ctx.api_changeNo({ from: '99', to: '98' }), /명단에 99번/);
+  // 새 번호로 같은 날짜 기록이 이미 있으면 막음 (명단에는 없는 번호 73의 기록)
+  register(g);
+  g.ctx.api_save({ cards: pendingCards(g), skips: [] });
+  assert.throws(() => g.ctx.api_changeNo({ from: '56', to: '73' }), /날짜가 겹칩니다: 2026-10-09/);
+  assert.equal(g.ss.getSheetByName('수업기록').objects()[0].학생번호, '56');
+});

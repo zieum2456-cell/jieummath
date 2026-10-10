@@ -729,9 +729,64 @@
     $('roster-count').textContent = `(재원 ${list.filter((s) => s.status !== '퇴원').length}명)`;
     $('roster-body').innerHTML = list.length
       ? list.map((s) => `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td>
-          <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td></tr>`).join('')
-      : '<tr><td colspan="6" class="empty">명단이 비어 있습니다. 위에서 불러오세요.</td></tr>';
+          <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td>
+          <td><button class="btn small" data-chno="${esc(s.no)}">번호 변경</button></td></tr>`
+          + (S.chNo === s.no ? `<tr><td colspan="7"><div class="row">
+            <span>${esc(s.no)}번 ${esc(s.name)} → 새 번호</span>
+            <input id="chno-input" inputmode="numeric" maxlength="2" style="width:80px" autocomplete="off">
+            <button class="btn small primary" id="chno-go">변경</button><button class="btn small" id="chno-cancel">취소</button></div>
+            <div class="muted">이 학생의 수업기록(학생번호·기록ID)도 함께 바뀝니다. 결제일 관리 앱의 학생번호는 따로 바꿔 주세요.</div></td></tr>` : '')).join('')
+      : '<tr><td colspan="7" class="empty">명단이 비어 있습니다. 위에서 불러오세요.</td></tr>';
     renderRosterDiff();
+    const input = $('chno-input');
+    if (input) {
+      input.focus();
+      $('chno-cancel').addEventListener('click', () => {
+        S.chNo = null;
+        renderRoster();
+      });
+      $('chno-go').addEventListener('click', () => changeNo(S.chNo, input.value));
+    }
+  }
+
+  $('roster-body').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-chno]');
+    if (!b) return;
+    S.chNo = S.chNo === b.dataset.chno ? null : b.dataset.chno;
+    renderRoster();
+  });
+
+  // 학생번호 변경: 먼저 몇 건이 바뀌는지 확인하고, 한 번 더 물은 뒤 바꾼다
+  async function changeNo(from, input) {
+    const to = C.normalizeNo(input);
+    if (to == null) return toast('새 번호는 숫자 두 자리로 입력해 주세요.');
+    busy('확인 중…');
+    let plan;
+    try {
+      plan = await run('api_changeNo', { from, to, dryRun: true });
+    } catch (e) {
+      idle();
+      return alert(e.message);
+    }
+    idle();
+    if (!confirm(`${from}번 ${plan.name} 학생의 번호를 ${to}번으로 바꿀까요?\n\n`
+      + `수업기록 ${plan.count}건의 학생번호와 기록ID도 함께 바뀝니다.\n`
+      + '결제일 관리 앱의 학생번호는 따로 바꿔 주세요. (안 바꾸면 다음 불러오기 때 옛 번호가 다시 추가됩니다)')) return;
+    busy('번호 변경 중…');
+    try {
+      const r = await run('api_changeNo', { from, to });
+      S.roster = r.roster;
+      S.chNo = null;
+      // 저장된 기록 조회 결과가 바뀌었으니 확인 대기 카드를 다시 검사한다
+      S.existing = {};
+      await loadPending();
+      renderRoster();
+      toast(`${from}번 → ${to}번으로 바꿨습니다. (기록 ${r.count}건)`);
+    } catch (e) {
+      alert('번호 변경 중 오류가 났습니다. 구글 시트의 학생명단·수업기록 탭에서 번호가 어떻게 돼 있는지 확인해 주세요.\n' + e.message);
+    } finally {
+      idle();
+    }
   }
 
   function renderRosterDiff() {

@@ -505,6 +505,67 @@ function api_applyRoster(c) {
 }
 
 /**
+ * 학생번호 변경: 학생명단과 그 학생의 수업기록(학생번호·기록ID)을 함께 바꾼다.
+ * c: { from, to, dryRun } → { name, count, conflicts: [수업일] }
+ *  - 새 번호를 명단에서 누가 쓰고 있으면(퇴원 포함) 바꾸지 않는다 (번호는 다시 쓰지 않음)
+ *  - 새 번호로 같은 날짜 기록이 이미 있으면 바꾸지 않고 그 날짜를 알려 준다
+ *  - dryRun 이면 바꾸지 않고 몇 건이 바뀔지만 알려 준다
+ */
+function api_changeNo(c) {
+  return withLock_(() => {
+    const from = String(c.from || '');
+    const to = String(c.to || '').trim();
+    if (!/^\d{2}$/.test(to)) throw new Error('새 학생번호는 숫자 두 자리로 입력해 주세요. (예: 07, 57)');
+    if (to === from) throw new Error('지금 번호와 같습니다.');
+    const roster = readObjects_('roster');
+    const me = roster.find((r) => r.학생번호 === from);
+    if (!me) throw new Error(`명단에 ${from}번 학생이 없습니다.`);
+    const taken = roster.find((r) => r.학생번호 === to);
+    if (taken) throw new Error(`${to}번은 이미 ${taken.이름}${taken.상태 === '퇴원' ? '(퇴원)' : ''} 학생이 쓰고 있습니다. 번호는 다시 쓰지 않습니다.`);
+
+    const sh = sheet_('records');
+    const values = sh.getDataRange().getDisplayValues();
+    const head = values[0] || [];
+    const col = (h) => head.indexOf(h);
+    const iId = col('기록ID');
+    const iNo = col('학생번호');
+    const iDate = col('수업일');
+    const iUpd = col('수정일시');
+    const rows = values.slice(1);
+    const keys = {};
+    rows.forEach((r) => (keys[r[iId]] = true));
+    const mine = rows.filter((r) => r[iNo] === from);
+    const conflicts = mine.filter((r) => keys[`${r[iDate]}_${to}`]).map((r) => r[iDate]);
+    const out = { name: me.이름, count: mine.length, conflicts };
+    if (conflicts.length) {
+      throw new Error(`${to}번으로 이미 저장된 기록과 날짜가 겹칩니다: ${conflicts.join(', ')}. 수업기록 탭에서 겹치는 기록을 먼저 정리해 주세요.`);
+    }
+    if (c.dryRun) return out;
+
+    const time = now_();
+    if (rows.length && mine.length) {
+      // 기록ID·학생번호·수정일시 세 열만 통째로 다시 쓴다
+      rows.forEach((r) => {
+        if (r[iNo] !== from) return;
+        r[iNo] = to;
+        r[iId] = `${r[iDate]}_${to}`;
+        r[iUpd] = time;
+      });
+      [iId, iNo, iUpd].forEach((i) => {
+        const range = sh.getRange(2, i + 1, rows.length, 1);
+        range.setNumberFormat('@');
+        range.setValues(rows.map((r) => [r[i]]));
+      });
+    }
+    const note = `${time.slice(0, 10)} ${from}번에서 ${to}번으로 변경(기록 ${mine.length}건)`;
+    Object.assign(me, { 학생번호: to, 메모: [me.메모, note].filter(Boolean).join(' / '), 수정일시: time });
+    writeObject_('roster', me._row, me);
+    out.roster = rosterList_();
+    return out;
+  });
+}
+
+/**
  * 결제일 관리 앱(Firebase)에서 학생 명단 읽기
  * Firestore 문서 users/{로그인한 사람}/apps/payment 의 json 필드 → { students: [{no,name,grade}], noNumber: [이름] }
  */
