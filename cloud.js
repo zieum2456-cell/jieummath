@@ -161,13 +161,46 @@
     }
   }
 
+  /*
+   * 카카오톡·네이버 등 앱 안의 브라우저(웹뷰)는 구글 로그인을 막고,
+   * 로그인 창(firebaseapp.com)이 저장소를 못 써서 'Unable to save initial state' 오류가 난다.
+   * 이런 경우에는 Chrome/Safari로 다시 열도록 안내한다.
+   */
+  function inAppBrowser(ua) {
+    return /KAKAOTALK|NAVER\(inapp|DaumApps|Instagram|FBAN|FBAV|Line\/|everytimeApp|; wv\)/i.test(ua || '');
+  }
+
+  function openInExternalBrowser() {
+    const ua = navigator.userAgent;
+    const url = location.href;
+    if (/KAKAOTALK/i.test(ua)) {
+      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+      return;
+    }
+    if (/Android/i.test(ua)) {
+      location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+      return;
+    }
+    alert('앱 안의 브라우저에서는 구글 로그인을 할 수 없습니다.\n'
+      + '화면 오른쪽 위(또는 아래) 메뉴에서 [Safari로 열기] 또는 [다른 브라우저로 열기]를 눌러 주세요.');
+  }
+
   async function login() {
+    if (inAppBrowser(navigator.userAgent)) {
+      if (confirm('앱 안의 브라우저에서는 구글 로그인이 되지 않습니다.\nChrome(또는 Safari)에서 열까요?')) openInExternalBrowser();
+      return;
+    }
     const provider = new fb.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
       await fb.signInWithPopup(auth, provider);
     } catch (e) {
-      if (e.code === 'auth/popup-blocked') return fb.signInWithRedirect(auth, provider).catch(loginError);
+      // 페이지 이동(redirect) 방식은 GitHub Pages ↔ firebaseapp.com 처럼 주소가 다르면
+      // 최신 브라우저에서 'Unable to save initial state' 오류가 나므로 쓰지 않는다.
+      if (e.code === 'auth/popup-blocked') {
+        alert('팝업이 차단되어 로그인 창을 열 수 없습니다.\n주소창 오른쪽의 팝업 차단 표시를 눌러 이 사이트의 팝업을 허용한 뒤 다시 로그인해 주세요.');
+        return;
+      }
       loginError(e);
     }
   }
@@ -303,5 +336,5 @@
     }
   }
 
-  return { decide, attach, push, flush, watch };
+  return { decide, inAppBrowser, attach, push, flush, watch };
 });
