@@ -37,7 +37,7 @@ test('휴강·이월 결강은 결제일을 미루고, 차감 결강은 미루�
   assert.ok(r.sessions.some((x) => x.date === '2026-10-14' && x.kind === '결강'));
   assert.equal(
     P.buildMessage(s, r),
-    '120분 * 8회(주2일)\n수업 시작일: 2026.11.09\n--\n휴강: 10/07(학원 휴무)\n결강: 10/12(병결), 10/14(무단, 회차 차감)'
+    '120분 * 8회(주2일)\n수업 시작일: 2026.11.09\n--\n휴강: 10/07(학원 휴무)\n결강: 10/12(병결)\n결강(회차차감): 10/14(무단)'
   );
 });
 
@@ -145,4 +145,12 @@ test('진도카드용 명단 텍스트: 번호 순, 번호 없는 학생 제외'
     { no: '07', name: '박지아' },
   ];
   assert.equal(P.rosterText(students), '07\t박지아\t\n56\t김도윤\t초4');
+});
+
+test('회차 차감 결강만 있으면 결강 줄 없이 결강(회차차감) 줄만 표시', () => {
+  const s = base();
+  s.events = [{ type: '결강', date: '2026-10-14', reason: '', counted: true }];
+  const msg = P.buildMessage(s, P.computeCycle(s, []));
+  assert.match(msg, /--\n결강\(회차차감\): 10\/14$/);
+  assert.ok(!/^결강: /m.test(msg));
 });

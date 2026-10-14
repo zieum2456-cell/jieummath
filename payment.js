@@ -201,10 +201,7 @@
   }
 
   function fmtException(ex) {
-    const reasons = [];
-    if (ex.reason) reasons.push(ex.reason);
-    if (ex.type === '결강' && ex.counted) reasons.push('회차 차감');
-    const r = reasons.length ? `(${reasons.join(', ')})` : '';
+    const r = ex.reason ? `(${ex.reason})` : '';
     if (ex.type === '대체') return `${fmtMD(ex.date)}${r} → ${fmtMD(ex.toDate)}`;
     return `${fmtMD(ex.date)}${r}`;
   }
@@ -221,14 +218,15 @@
     lines.push(`수업 시작일: ${result.nextDate ? fmtDot(result.nextDate) : '-'}`); // 다음 회차 첫 수업일
 
     const groups = [
-      ['휴강', '휴강'],
-      ['결강', '결강'],
-      ['대체', '대체수업'],
-      ['보충', '보충'],
+      ['휴강', (ex) => ex.type === '휴강'],
+      ['결강', (ex) => ex.type === '결강' && !ex.counted],
+      ['결강(회차차감)', (ex) => ex.type === '결강' && ex.counted],
+      ['대체수업', (ex) => ex.type === '대체'],
+      ['보충', (ex) => ex.type === '보충'],
     ];
     const body = [];
-    for (const [type, label] of groups) {
-      const list = result.exceptions.filter((ex) => ex.type === type);
+    for (const [label, match] of groups) {
+      const list = result.exceptions.filter(match);
       if (list.length) body.push(`${label}: ${list.map(fmtException).join(', ')}`);
     }
     if (body.length) lines.push('--', ...body);
