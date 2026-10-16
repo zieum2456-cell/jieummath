@@ -11,17 +11,18 @@ jobs:
         run: |
           mkdir out; cd out
           UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36'
+          B=https://haedeun.icees.kr
           for b in 306002:020503 306004:020504 306006:020505 306008:020506; do
             id=${b%%:*}; m=${b##*:}
-            curl -sS -m 30 -A "$UA" -c jar -b jar -D h_$id.txt "https://haedeun.icees.kr/boardCnts/list.do?boardID=$id&m=$m&s=haden" -o list_$id.html || echo "FAIL $id"
-            echo "== $id"; head -1 h_$id.txt; wc -c list_$id.html
+            curl -sS -m 30 -A "$UA" "$B/boardCnts/list.do?boardID=$id&m=$m&s=haden" -o list_$id.html
+            echo "== $id titles"; grep -o -E 'id="subject_[0-9]+"[^>]*title="[^"]*"' list_$id.html | sed -E 's/.*subject_([0-9]+).*title="([^"]*)"/\1 | \2/'
+            echo "== $id paging"; grep -n -i -E 'goPage|page=|class="(paging|pagination)' list_$id.html | head -8
+            seq=$(grep -o -E 'subject_[0-9]+' list_$id.html | head -1 | cut -d_ -f2)
+            curl -sS -m 30 -A "$UA" -c jar_$id -b jar_$id -e "$B/boardCnts/list.do?boardID=$id&m=$m&s=haden" "$B/boardCnts/view.do?boardID=$id&viewBoardID=$id&boardSeq=$seq&lev=0&action=view&searchType=S&statusYN=W&page=1&m=$m&s=haden" -o view_$id.html
+            echo "== $id view $seq"; wc -c view_$id.html
+            grep -n -i -E '<img|fileDown|download|\.jpe?g|\.png|\.gif|첨부' view_$id.html | grep -v -i -E 'common|/images/(main|sub|layout|btn|icon)|logo' | head -40
           done
-          echo "== list 306002 lines"
-          grep -n -i -E 'view\.do|boardSeq|onclick|class="(tit|subject|title)' list_306002.html | head -80
-          U=$(grep -o -E 'view\.do[^"'"'"' <]*' list_306002.html | head -1 | sed 's/&amp;/\&/g')
-          echo "first view: $U"
-          [ -n "$U" ] && curl -sS -m 30 -A "$UA" -c jar -b jar "https://haedeun.icees.kr/boardCnts/$U" -o view.html
-          [ -f view.html ] && { wc -c view.html; grep -n -i -E '<img|fileDown|download|\.jpe?g|\.png' view.html | head -80; }
+          echo "== raw view 306002 head"; sed -n '1,40p' view_306002.html | cut -c1-300
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: out, path: out }
