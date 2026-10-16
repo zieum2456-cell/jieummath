@@ -4,6 +4,7 @@
   const SW = window.SchoolWeekly;
   const $ = (id) => document.getElementById(id);
   const CAPTIONS = ['주간학습계획', '학급별 시간표'];
+  const SW_DAYS = ['월', '화', '수', '목', '금'];
   let weeks = [];
 
   function esc(s) {
@@ -13,6 +14,32 @@
   function todayUTC() {
     const d = new Date(); // 이 기기 시각 기준 오늘 날짜
     return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  }
+
+  function figure(caption, src, alt, href) {
+    return `<figure><figcaption>${caption}</figcaption><a href="${esc(href || src)}" target="_blank" rel="noopener">` +
+      `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer"></a></figure>`;
+  }
+
+  // 왼쪽: 주간학습계획의 수학 줄 + 가정통신 줄 (못 잘랐으면 원본)
+  function planView(b, p, x) {
+    if (x && x.plan) return figure('주간학습계획 · 수학, 가정통신', x.plan, `${b.grade}학년 주간학습계획 수학`, p.images[0]);
+    return figure('주간학습계획', p.images[0], `${b.grade}학년 주간학습계획`);
+  }
+
+  // 오른쪽: 반 × 월~금 표에 수학이 있는 칸 표시 (못 읽었으면 원본 시간표)
+  function mathView(b, p, x) {
+    if (!(x && x.math && Object.keys(x.math).length)) {
+      return p.images[1] ? figure('학급별 시간표', p.images[1], `${b.grade}학년 학급별 시간표`) : '';
+    }
+    const guessed = new Set((x.guessed || []).map(String));
+    const classes = Object.keys(x.math).sort((a, c) => a - c);
+    const rows = classes.map((k) => `<tr><th>${k}반${guessed.has(k) ? ' <span class="guess">(추정)</span>' : ''}</th>` +
+      SW_DAYS.map((d) => x.math[k].includes(d) ? '<td class="on">수학</td>' : '<td></td>').join('') + '</tr>').join('');
+    return `<figure><figcaption>반별 수학 요일</figcaption><table class="math">` +
+      `<thead><tr><th>반</th>${SW_DAYS.map((d) => `<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>` +
+      (guessed.size ? '<p class="muted">(추정): 반 번호를 읽지 못해 앞 반 다음 번호로 짐작했습니다. 원본 시간표로 확인해 주세요.</p>' : '') +
+      '</figure>';
   }
 
   function render(monday) {
@@ -28,13 +55,15 @@
         return `<section class="grade"><div class="grade-head"><h2>${b.grade}학년</h2></div>` +
           `<div class="empty">이 주의 게시물이 아직 없습니다. <a href="${esc(SW.listUrl(b, 1))}" target="_blank" rel="noopener">게시판 보기</a></div></section>`;
       }
-      const imgs = p.images.length
-        ? p.images.map((src, k) => `<figure><figcaption>${CAPTIONS[k] || ''}</figcaption>` +
-            `<a href="${esc(src)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="${b.grade}학년 ${CAPTIONS[k] || ''}" loading="lazy" referrerpolicy="no-referrer"></a></figure>`).join('')
-        : '<div class="empty">게시물에서 이미지를 찾지 못했습니다. 원본 게시물을 확인해 주세요.</div>';
+      const x = p.extract && p.extract.from && p.extract.from.join('\n') === p.images.slice(0, 2).join('\n') ? p.extract : null;
+      const links = p.images.map((src, k) => `<a href="${esc(src)}" target="_blank" rel="noopener">${CAPTIONS[k] || '이미지 ' + (k + 1)}</a>`).join(' · ');
       return `<section class="grade"><div class="grade-head"><h2>${b.grade}학년</h2>` +
-        `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)} ↗</a></div>` +
-        `<div class="imgs">${imgs}</div></section>`;
+        `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)} ↗</a>` +
+        (p.images.length ? `<span class="orig">원본 보기: ${links}</span>` : '') + '</div>' +
+        (p.images.length
+          ? `<div class="imgs${x && x.math ? ' cut' : ''}">${planView(b, p, x)}${mathView(b, p, x)}</div>`
+          : '<div class="empty">게시물에서 이미지를 찾지 못했습니다. 원본 게시물을 확인해 주세요.</div>') +
+        '</section>';
     }).join('');
   }
 
@@ -68,7 +97,7 @@
       if (data.updatedAt) {
         const t = new Date(data.updatedAt);
         $('info').textContent = `학교 홈페이지 게시판에서 자동으로 모읍니다 (마지막 변경: ${t.toLocaleString('ko-KR')}). ` +
-          '이미지를 누르면 크게 볼 수 있습니다. 키보드 ←/→로 주를 넘길 수 있습니다.';
+          '이미지를 누르면 원본을 크게 볼 수 있습니다. 키보드 ←/→로 주를 넘길 수 있습니다.';
       }
     })
     .catch((e) => { $('list').innerHTML = `<p class="err">데이터를 불러오지 못했습니다: ${esc(e.message)}</p>`; });

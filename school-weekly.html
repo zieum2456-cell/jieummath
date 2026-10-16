@@ -35,10 +35,18 @@
   .grade-head h2 { margin: 0; font-size: 18px; color: var(--accent); }
   .grade-head a { color: var(--muted); font-size: 13px; }
   .imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 760px) { .imgs { grid-template-columns: 1fr; } }
+  .imgs.cut { grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); }
+  @media (max-width: 760px) { .imgs, .imgs.cut { grid-template-columns: 1fr; } }
   figure { margin: 0; min-width: 0; }
   figcaption { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
   figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .grade-head .orig { margin-left: auto; font-size: 13px; color: var(--muted); }
+  table.math { border-collapse: collapse; width: 100%; max-width: 420px; font-size: 14px; }
+  table.math th, table.math td { border: 1px solid var(--line); padding: 4px 6px; text-align: center; }
+  table.math thead th { background: var(--bg); }
+  table.math tbody th { white-space: nowrap; font-weight: 600; }
+  table.math td.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .guess { color: var(--muted); font-weight: 400; font-size: 12px; }
   .empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; }
   @media print {
     header, .no-print { display: none !important; }
@@ -63,7 +71,7 @@
   <p class="muted no-print" id="info"></p>
 </main>
 
-<script src="school-weekly.js?v=20261016-2"></script>
-<script src="school-weekly-app.js?v=20261016"></script>
+<script src="school-weekly.js?v=20261016-3"></script>
+<script src="school-weekly-app.js?v=20261016-2"></script>
 </body>
 </html>

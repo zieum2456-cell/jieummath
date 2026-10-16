@@ -88,6 +88,16 @@ test('같은 주차끼리 묶고 최신 주가 먼저, 같은 주 같은 학년�
   assert.deepEqual(Object.keys(weeks[1].grades), ['3', '4']);
 });
 
+test('수학 부분 뽑은 결과(extract)는 묶을 때도 그대로 남는다', () => {
+  const extract = { from: ['1', '2'], plan: 'school-weekly/2026-10-12/3.jpg', math: { 1: ['월'] }, guessed: [] };
+  const weeks = SW.groupWeeks([
+    { grade: 3, seq: '10', title: 'a', week: '2026-10-12', images: ['1', '2'], extract },
+    { grade: 4, seq: '11', title: 'b', week: '2026-10-12', images: [] },
+  ]);
+  assert.deepEqual(weeks[0].grades[3].extract, extract);
+  assert.equal('extract' in weeks[0].grades[4], false);
+});
+
 test('처음 보여 줄 주: 평일은 이번 주, 주말은 다음 주(있으면)', () => {
   const weeks = [{ monday: '2026-10-19' }, { monday: '2026-10-12' }, { monday: '2026-10-05' }];
   assert.equal(SW.defaultWeek(weeks, new Date(Date.UTC(2026, 9, 14))), '2026-10-12'); // 수

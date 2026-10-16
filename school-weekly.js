@@ -133,6 +133,7 @@
       // 같은 주에 글이 여럿이면 나중 글(번호가 큰 글)을 쓴다
       if (!g[p.grade] || Number(p.seq) > Number(g[p.grade].seq)) {
         g[p.grade] = { seq: p.seq, title: p.title, url: p.url, images: p.images || [] };
+        if (p.extract) g[p.grade].extract = p.extract; // 수학 부분 뽑은 결과 (scripts/school-weekly-extract.py)
       }
     }
     return [...map.values()].sort((a, b) => (a.monday < b.monday ? 1 : -1));
