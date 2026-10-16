@@ -1,32 +1,39 @@
 #!/usr/bin/env python3
 """
-주간학습안내 무료 OCR(tesseract) 테스트.
+주간학습안내에서 수학 부분만 뽑아 school-weekly-data.json에 더한다 (무료 OCR, tesseract).
 
-school-weekly-data.json의 한 주(기본: 가장 최근 주) 3~6학년 이미지를 받아
-  1) 주간학습계획: '수학'이 적힌 칸을 찾아 그 줄(가로)과 그 열(세로)을 잘라 본다.
-  2) 학급별 시간표: 칸마다 글자를 읽어 '몇 반 · 무슨 요일'에 수학이 있는지 뽑아 본다.
-결과는 ocr-test/ 폴더(요약 summary.md, 칸별 인식 결과, 표시한 이미지, 자른 이미지)에 저장한다.
-GitHub Actions에서는 요약이 실행 화면(Summary)에 바로 나온다.
+학년마다
+  1) 주간학습계획: '수학' 줄과 '가정통신' 줄을 찾아 위아래로 이어 붙인 이미지를
+     school-weekly/<월요일>/<학년>.jpg 로 저장한다.
+  2) 학급별 시간표: 반마다 작은 표를 찾아, 머리줄 '수'(수요일)와 글자 모양이 닮은 칸을
+     수학으로 보아 반별 수학 요일을 뽑는다.
+결과는 게시물마다 "extract": {"from": [계획 이미지, 시간표 이미지], "plan": 자른 이미지 경로,
+"math": {"1": ["화", "수"], ...}, "guessed": [번호를 추정한 반]} 으로 적는다.
+이미지가 바뀌지 않은 게시물은 다시 읽지 않는다. GitHub Actions(school-weekly.yml)에서 수집 뒤에 실행한다.
 
-사용: python3 scripts/school-weekly-ocr-test.py [월요일 날짜 YYYY-MM-DD]
-      python3 scripts/school-weekly-ocr-test.py --files 계획.jpg 시간표.jpg   (내려받은 이미지로 바로 시험)
+사용: python3 scripts/school-weekly-extract.py            (데이터 파일의 모든 주)
+      python3 scripts/school-weekly-extract.py --files 계획.jpg 시간표.jpg   (이미지 두 장으로 바로 시험)
 필요: tesseract-ocr, tesseract-ocr-kor, pip install pytesseract pillow numpy scipy
 """
+import io
 import json
 import os
 import re
+import shutil
 import sys
 import urllib.request
+from datetime import datetime, timezone
 
 import numpy as np
 import pytesseract
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, 'ocr-test')
+DATA = os.path.join(ROOT, 'school-weekly-data.json')
+CROPS = 'school-weekly'  # 자른 이미지를 두는 폴더 (저장소 기준)
 DAYS = ['월', '화', '수', '목', '금']
 MATH_RE = re.compile(r'수\s*학')
-CLASS_RE = re.compile(r'(\d{1,2})\s*[반받밤발]')  # '반'을 '받' 등으로 잘못 읽는 경우가 많다
+NOTICE_RE = re.compile(r'가\s*정|통\s*신')
 
 
 # ---------- 표 칸 나누기 ----------
@@ -101,57 +108,25 @@ def read_table(img):
     return rows, cols, cells
 
 
-def cells_markdown(cells, rows, cols):
-    if not cells:
-        return '_표 칸을 찾지 못했습니다._\n'
-    n_r, n_c = len(rows) - 1, len(cols) - 1
-    table = [[''] * n_c for _ in range(n_r)]
-    for x in cells:
-        table[x['r']][x['c']] = x['text'].replace('|', '/')
-    head = '| |' + '|'.join(str(c) for c in range(n_c)) + '|\n|' + '---|' * (n_c + 1) + '\n'
-    return head + ''.join(f'|{r}|' + '|'.join(table[r]) + '|\n' for r in range(n_r))
+# ---------- 1) 주간학습계획: 수학 줄 + 가정통신 줄 ----------
 
-
-# ---------- 1) 주간학습계획: 수학 칸 자르기 ----------
-
-NOTICE_RE = re.compile(r'가\s*정|통\s*신')
-
-
-def plan_test(img, name):
+def plan_crop(img):
+    """수학 줄과 가정통신 줄을 위아래로 이어 붙인 이미지 (수학 줄을 못 찾으면 None)"""
     rows, cols, cells = read_table(img)
     math = [x for x in cells if MATH_RE.search(x['text'])]
+    if not math:
+        return None
     # 가정통신: 첫 칸에 '가정 / 통신' 두 줄로 적혀 있어 한 줄 읽기(psm 7)로는 못 읽는 경우가 많다
-    notice = []
-    for x in cells:
-        if x['c'] != 0:
-            continue
-        if not NOTICE_RE.search(x['text']):
-            x['text2'] = ocr_cell(img, x['box'], psm='6')
-            if not NOTICE_RE.search(x['text2']):
-                continue
-        notice.append(x)
-    lines = [f'- 표 칸: 가로 {max(len(rows) - 1, 0)}줄 × 세로 {max(len(cols) - 1, 0)}칸',
-             f'- "수학" 찾은 칸: {len(math)}개, "가정통신" 찾은 칸: {len(notice)}개']
-    left, right = (cols[0], cols[-1]) if cols else (0, img.width)
-    bands = []
-    for label, found in (('수학', math), ('가정통신', notice)):
-        if found:
-            bands.append((min(x['box'][1] for x in found), max(x['box'][3] for x in found)))
-    if math:
-        r0, r1 = bands[0]
-        img.crop((left, r0, right, r1)).save(os.path.join(OUT, f'{name}_수학_가로줄.png'))
-        lines.append('- 수학 칸 내용: ' + ' / '.join(f'"{x["text"]}"' for x in math[:6]))
-    if bands:
-        # 수학 줄과 가정통신 줄을 위아래로 이어 붙인 한 장 (최종 화면에 쓸 모양)
-        parts = [img.crop((left, r0, right, r1)) for r0, r1 in bands]
-        out = Image.new('RGB', (right - left, sum(p.height for p in parts)), 'white')
-        y = 0
-        for part in parts:
-            out.paste(part, (0, y)); y += part.height
-        out.save(os.path.join(OUT, f'{name}_수학_가정통신.png'))
-        lines.append(f'- 잘라 본 이미지: `{name}_수학_가정통신.png`' + (f', `{name}_수학_가로줄.png`' if math else ''))
-    annotate(img, rows, cols, math + notice, name)
-    return '\n'.join(lines) + '\n', cells_markdown(cells, rows, cols)
+    notice = [x for x in cells if x['c'] == 0 and (NOTICE_RE.search(x['text']) or NOTICE_RE.search(ocr_cell(img, x['box'], psm='6')))]
+    left, right = cols[0], cols[-1]
+    bands = [(min(x['box'][1] for x in f), max(x['box'][3] for x in f)) for f in (math, notice) if f]
+    parts = [img.crop((left, r0, right, r1)) for r0, r1 in bands]
+    out = Image.new('RGB', (right - left, sum(p.height for p in parts)), 'white')
+    y = 0
+    for part in parts:
+        out.paste(part, (0, y))
+        y += part.height
+    return out
 
 
 # ---------- 2) 학급별 시간표: 반별 수학 요일 ----------
@@ -247,148 +222,121 @@ SEED = 0.45  # 1단계: 머리줄 '수'(수요일)와 이 이상 닮은 본문 �
 MATCH = 0.6  # 2단계: 기준 모양과 이 이상 닮으면 수학으로 본다
 
 
-def timetable_test(img, name):
+def math_days(img):
+    """반별 수학 요일 ({반: [요일...]}, 번호를 추정한 반 목록). 반 시간표를 못 찾으면 ({}, [])"""
     blocks, h, v = table_blocks(img)
-    found, report, marks, guesses, parsed = {}, [], [], set(), []
-    all_rows, all_cols = [], []
-    skipped = 0
+    parsed = []
     for b in sorted(blocks, key=lambda b: (round(b[1] / 40), b[0])):
         rows, cols = block_grid(b, h, v)
         n_r, n_c = len(rows) - 1, len(cols) - 1
         if n_c != 6 or n_r < 7:  # 반 시간표가 아닌 표(영어·음악 전담 등)는 건너뜀
-            skipped += 1
             continue
-        all_rows += rows; all_cols += cols
         n_title = n_r - 7
-        k, label, looks = class_name(img, rows, cols, n_title)
+        k, _, looks = class_name(img, rows, cols, n_title)
         if k is None and not looks:  # 반 이름이 없는 표(영어·음악 전담, 강당 등)는 반 시간표가 아님
-            skipped += 1
             continue
         guessed = k is None
         if guessed:
             k = (max(x[0] for x in parsed) if parsed else 0) + 1
         # 과목 글자는 OCR 대신, 같은 표 머리줄의 '수'(수요일) 글자 모양과 비교한다 (같은 글꼴이라 잘 맞는다)
-        hr = n_r - 7
-        tmpl = glyph(img, (cols[3], rows[hr], cols[4], rows[hr + 1]))
+        tmpl = glyph(img, (cols[3], rows[n_title], cols[4], rows[n_title + 1]))
         cells = []
         for p in range(6):
             r = n_r - 6 + p
             for d in range(5):
-                box = (cols[d + 1], rows[r], cols[d + 2], rows[r + 1])
-                cells.append((p, d, box, glyph(img, box)))
-        parsed.append((k, guessed, label, tmpl, cells))
+                cells.append((d, glyph(img, (cols[d + 1], rows[r], cols[d + 2], rows[r + 1]))))
+        parsed.append((k, guessed, tmpl, cells))
 
     def score(g, t):
         return float((g * t).sum()) if g is not None and t is not None else None
 
     # 2단계: 머리줄 '수'와 꽤 닮은 본문 칸들의 평균 모양을 새 기준으로 삼는다.
     # (머리줄 글자가 본문보다 굵은 양식(5학년)에서도 본문 '수'끼리는 아주 닮았다)
-    pool = [g for _, _, _, t, cells in parsed for _, _, _, g in cells if (score(g, t) or 0) >= SEED]
+    pool = [g for _, _, t, cells in parsed for _, g in cells if (score(g, t) or 0) >= SEED]
     ref = None
     if len(pool) >= 3:
         ref = np.mean(pool, axis=0)
         ref = ref - ref.mean()
         ref = ref / np.linalg.norm(ref)
 
-    for k, guessed, label, tmpl, cells in parsed:
-        grid = [[None] * 5 for _ in range(6)]
-        days = set()
-        for p, d, box, g in cells:
-            sim = score(g, ref if ref is not None else tmpl)
-            grid[p][d] = sim
-            if sim is not None and sim >= MATCH:
-                days.add(DAYS[d])
-                marks.append({'box': box})
-        found[k] = days
+    found, guesses = {}, []
+    for k, guessed, tmpl, cells in parsed:
+        days = {DAYS[d] for d, g in cells if (score(g, ref if ref is not None else tmpl) or 0) >= MATCH}
+        found[k] = [d for d in DAYS if d in days]
         if guessed:
-            guesses.add(k)
-        grid_txt = [' '.join('  · ' if x is None else f'{x:4.2f}' for x in row) for row in grid]
-        report.append(f'<details><summary>{k}반{" (번호 추정)" if guessed else ""} (반 이름 인식: "{label}")</summary>\n\n```\n'
-                      "'수'와 닮은 정도 (0.6 이상 = 수학)\n 월   화   수   목   금\n" + '\n'.join(grid_txt) + '\n```\n</details>')
-    lines = [f'- 찾은 반 시간표 블록: {len(found)}개 (반 시간표가 아닌 표 {skipped}개 건너뜀)']
-    if found:
-        lines.append('\n| 반 | 수학 요일 |\n|---|---|')
-        for k in sorted(found):
-            lines.append(f'| {k}반{" (번호 추정)" if k in guesses else ""} | {", ".join(d for d in DAYS if d in found[k]) or "-"} |')
-        lines.append('\n블록별로 읽은 과목 글자:\n\n' + '\n'.join(report))
-    else:
-        lines.append('- 반 시간표 블록을 찾지 못했습니다.')
-    annotate(img, sorted(set(all_rows)), sorted(set(all_cols)), marks, name)
-    return '\n'.join(lines) + '\n', ''
+            guesses.append(k)
+    return found, sorted(guesses)
 
 
-# ---------- 공통 ----------
+# ---------- 데이터 파일 갱신 ----------
 
-def annotate(img, rows, cols, marks, name):
-    a = img.convert('RGB')
-    d = ImageDraw.Draw(a)
-    for y in rows:
-        d.line([(0, y), (a.width, y)], fill=(255, 0, 0), width=1)
-    for x in cols:
-        d.line([(x, 0), (x, a.height)], fill=(0, 0, 255), width=1)
-    for m in marks:
-        d.rectangle(m['box'], outline=(0, 180, 0), width=4)
-    a.save(os.path.join(OUT, f'{name}_표시.png'))
-
-
-def download(url, path):
+def download(url):
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=60) as r, open(path, 'wb') as f:
-        f.write(r.read())
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return Image.open(io.BytesIO(r.read())).convert('RGB')
+
+
+def extract(plan_img, tt_img, crop_path):
+    """한 게시물의 결과. 실패한 부분은 null로 둔다 (화면에서는 원본 이미지를 보여 준다)"""
+    out = {'plan': None, 'math': None, 'guessed': []}
+    try:
+        crop = plan_crop(plan_img)
+        if crop is not None:
+            os.makedirs(os.path.dirname(os.path.join(ROOT, crop_path)), exist_ok=True)
+            crop.save(os.path.join(ROOT, crop_path), quality=88)
+            out['plan'] = crop_path
+    except Exception as e:  # 한 부분이 실패해도 나머지는 계속한다
+        print(f'  계획표 자르기 실패: {e!r}')
+    try:
+        found, guesses = math_days(tt_img)
+        if found:
+            out['math'] = {str(k): found[k] for k in sorted(found)}
+            out['guessed'] = guesses
+    except Exception as e:
+        print(f'  시간표 읽기 실패: {e!r}')
+    return out
 
 
 def main():
-    os.makedirs(OUT, exist_ok=True)
     args = sys.argv[1:]
-    jobs = []  # (이름, 이미지 경로, 종류)
     if args[:1] == ['--files']:
-        plan, tt = args[1], args[2]
-        jobs = [('시험', plan, tt)]
-        title = '직접 넣은 이미지'
-    else:
-        data = json.load(open(os.path.join(ROOT, 'school-weekly-data.json'), encoding='utf-8'))
-        weeks = data.get('weeks', [])
-        week = next((w for w in weeks if w['monday'] == args[0]), None) if args else (weeks[0] if weeks else None)
-        if not week:
-            sys.exit('해당 주 데이터가 없습니다.')
-        title = f'{week["monday"]} 주'
-        for g in sorted(week['grades'], key=int):
-            imgs = week['grades'][g]['images']
-            if len(imgs) < 2:
-                print(f'{g}학년: 이미지가 2장보다 적어 건너뜀')
+        r = extract(Image.open(args[1]).convert('RGB'), Image.open(args[2]).convert('RGB'), 'ocr-test/계획표_수학.jpg')
+        print(json.dumps(r, ensure_ascii=False, indent=1))
+        return
+    data = json.load(open(DATA, encoding='utf-8'))
+    changed = False
+    for w in data.get('weeks', []):
+        for g in sorted(w['grades'], key=int):
+            p = w['grades'][g]
+            src = p.get('images', [])[:2]
+            if len(src) < 2 or (p.get('extract') or {}).get('from') == src:
                 continue
-            paths = []
-            for k, url in enumerate(imgs[:2]):
-                p = os.path.join(OUT, f'{g}학년_원본_{k + 1}.jpg')
-                download(url, p)
-                paths.append(p)
-            jobs.append((f'{g}학년', paths[0], paths[1]))
+            print(f'{w["monday"]} {g}학년 읽는 중…', flush=True)
+            try:
+                imgs = [download(u) for u in src]
+            except Exception as e:  # 이미지를 못 받으면 다음 실행 때 다시 해 본다
+                print(f'::warning::{w["monday"]} {g}학년 이미지 받기 실패: {e}')
+                continue
+            r = extract(imgs[0], imgs[1], f'{CROPS}/{w["monday"]}/{g}.jpg')
+            p['extract'] = {'from': src, **r}
+            changed = True
+            n = len(r['math'] or {})
+            print(f'  계획표 {"잘라 냄" if r["plan"] else "못 찾음"}, 반 시간표 {n}반' + (f' (번호 추정: {r["guessed"]})' if r['guessed'] else ''))
 
-    summary = [f'# 주간학습안내 무료 OCR 테스트 ({title})\n',
-               '초록 상자 = "수학"으로 읽은 칸, 빨강/파랑 선 = 찾은 표 줄. 이미지 파일은 실행 화면 아래 Artifacts의 `ocr-test`에 있습니다.\n']
-    detail = []
-    for name, plan, tt in jobs:
-        print(f'{name} 읽는 중…', flush=True)
-        try:
-            p_sum, p_cells = plan_test(Image.open(plan), f'{name}_주간학습계획')
-        except Exception as e:  # 한 학년이 실패해도 나머지 학년은 계속 시험한다
-            p_sum, p_cells = f'- 오류: {e!r}\n', ''
-        try:
-            t_sum, t_cells = timetable_test(Image.open(tt), f'{name}_학급별시간표')
-        except Exception as e:
-            t_sum, t_cells = f'- 오류: {e!r}\n', ''
-        summary.append(f'## {name}\n\n### 주간학습계획\n{p_sum}\n### 학급별 시간표\n{t_sum}\n')
-        detail.append(f'## {name} 주간학습계획 칸별 인식\n\n{p_cells}\n## {name} 학급별 시간표 칸별 인식\n\n{t_cells}\n')
-
-    text = '\n'.join(summary)
-    with open(os.path.join(OUT, 'summary.md'), 'w', encoding='utf-8') as f:
-        f.write(text)
-    with open(os.path.join(OUT, 'cells.md'), 'w', encoding='utf-8') as f:
-        f.write('\n'.join(detail))
-    if os.environ.get('GITHUB_STEP_SUMMARY'):
-        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-            f.write(text + '\n<details><summary>칸별 인식 결과 전체</summary>\n\n' + '\n'.join(detail) + '\n</details>\n')
-    print(text)
+    # 데이터에서 빠진 주의 자른 이미지는 지운다
+    keep = {w['monday'] for w in data.get('weeks', [])}
+    base = os.path.join(ROOT, CROPS)
+    for d in os.listdir(base) if os.path.isdir(base) else []:
+        if d not in keep:
+            shutil.rmtree(os.path.join(base, d))
+            changed = True
+    if changed:
+        data['updatedAt'] = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        with open(DATA, 'w', encoding='utf-8') as f:
+            f.write(json.dumps(data, ensure_ascii=False, indent=1) + '\n')
+        print('저장했습니다.')
+    else:
+        print('새로 읽을 게시물 없음')
 
 
 if __name__ == '__main__':

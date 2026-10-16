@@ -71,8 +71,8 @@
 - 평일에는 이번 주, 토·일요일에는 다음 주(올라와 있으면)를 먼저 보여 줍니다. ◀ ▶ 버튼이나 키보드 ←/→로 주를 넘깁니다. 이미지를 누르면 원본 크기로 열립니다.
 - 학교 사이트는 브라우저에서 바로 읽을 수 없어서, GitHub Actions(`.github/workflows/school-weekly.yml`)가 매주 금·토·일요일 오전 9시(한국 시각)에 게시판을 읽어 `school-weekly-data.json`을 갱신합니다. 바로 갱신하려면 GitHub 저장소 **Actions → 주간학습안내 모으기 → Run workflow**를 누르세요.
 - 정해진 시각 실행은 저장소의 기본 브랜치에서만 동작합니다. GitHub 사정에 따라 몇 분~수십 분 늦게 실행될 수 있습니다.
-- **OCR 테스트**(수학 부분만 남기기 준비): Actions → **주간학습안내 OCR 테스트 → Run workflow**를 누르면 무료 OCR(tesseract)로 주간학습계획의 수학 줄과 가정통신 줄을 찾아 잘라 붙이고, 학급별 시간표는 반마다 작은 표를 찾아 머리줄의 '수'(수요일) 글자 모양과 닮은 칸을 수학으로 보아 반별 수학 요일을 뽑아 봅니다. 결과는 실행 화면의 Summary에, 표시·자른 이미지는 Artifacts의 `ocr-test`에 나옵니다. 저장소에는 아무것도 바꾸지 않습니다. 직접 해 보려면 `python3 scripts/school-weekly-ocr-test.py --files 계획.jpg 시간표.jpg`
-- 파일: `school-weekly.js`(게시판 해석 로직) / `school-weekly-app.js`(화면 처리) / `school-weekly.html`(화면 구성) / `scripts/school-weekly-fetch.js`(수집 스크립트)
+- **수학 부분만 보기**: 수집 뒤에 무료 OCR(tesseract)로 학년마다 주간학습계획의 **수학 줄과 가정통신 줄**을 잘라 붙인 이미지(`school-weekly/<월요일>/<학년>.jpg`)를 만들고, 학급별 시간표는 반마다 작은 표를 찾아 머리줄의 '수'(수요일) 글자 모양과 닮은 칸을 수학으로 보아 **반별 수학 요일**을 뽑습니다(`scripts/school-weekly-extract.py`). 화면에는 왼쪽에 자른 계획표, 오른쪽에 반 × 월~금 표가 나오고, 원본 이미지는 학년 제목 옆 **원본 보기**로 엽니다. 반 번호를 읽지 못해 앞 반 다음 번호로 짐작한 반은 **(추정)**으로 표시합니다. 자르거나 읽지 못한 학년은 원본 이미지를 그대로 보여 줍니다. 직접 시험하려면 `python3 scripts/school-weekly-extract.py --files 계획.jpg 시간표.jpg`
+- 파일: `school-weekly.js`(게시판 해석 로직) / `school-weekly-app.js`(화면 처리) / `school-weekly.html`(화면 구성) / `scripts/school-weekly-fetch.js`(수집 스크립트) / `scripts/school-weekly-extract.py`(수학 부분 뽑기)
 
 ## 온라인 저장 (구글 로그인)
 

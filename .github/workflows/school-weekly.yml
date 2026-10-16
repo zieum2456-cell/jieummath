@@ -1,4 +1,5 @@
-# 학교 주간학습안내 게시판(3~6학년)을 읽어 school-weekly-data.json을 갱신한다.
+# 학교 주간학습안내 게시판(3~6학년)을 읽어 school-weekly-data.json을 갱신하고,
+# 무료 OCR(tesseract)로 학년별 수학·가정통신 줄 이미지(school-weekly/)와 반별 수학 요일을 뽑는다.
 # 바뀐 내용이 있을 때만 커밋한다. GitHub Actions 탭에서 "Run workflow"로 바로 실행할 수도 있다.
 name: 주간학습안내 모으기
 
@@ -24,9 +25,16 @@ jobs:
           node-version: 22
       - name: 게시판 읽기
         run: node scripts/school-weekly-fetch.js
+      - name: OCR 준비
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q tesseract-ocr tesseract-ocr-kor
+          pip install -q pytesseract pillow numpy scipy
+      - name: 수학 부분 뽑기
+        run: python3 scripts/school-weekly-extract.py
       - name: 바뀐 내용 커밋
         run: |
-          git add school-weekly-data.json
+          git add school-weekly-data.json school-weekly
           if git diff --cached --quiet; then echo "바뀐 내용 없음"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

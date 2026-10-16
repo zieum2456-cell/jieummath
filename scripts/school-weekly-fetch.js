@@ -72,6 +72,7 @@ async function main() {
         }
       }
       const post = { grade: board.grade, seq: item.seq, title: item.title, url, week, images };
+      if (prev && prev.extract) post.extract = prev.extract; // 이미지가 바뀌었는지는 뽑기 단계에서 확인한다
       const i = posts.findIndex((p) => p.grade === board.grade && p.seq === item.seq);
       if (i >= 0) posts[i] = post; else posts.push(post);
     }
