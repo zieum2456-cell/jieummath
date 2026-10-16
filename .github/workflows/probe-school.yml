@@ -1,0 +1,27 @@
+name: probe school board (temp)
+on:
+  push:
+    branches: [claude/lucid-feynman-5q74bj]
+    paths: ['.github/workflows/probe-school.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: fetch
+        run: |
+          mkdir out; cd out
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36'
+          for b in 306002:020503 306004:020504 306006:020505 306008:020506; do
+            id=${b%%:*}; m=${b##*:}
+            curl -sS -m 30 -A "$UA" -c jar -b jar -D h_$id.txt "https://haedeun.icees.kr/boardCnts/list.do?boardID=$id&m=$m&s=haden" -o list_$id.html || echo "FAIL $id"
+            echo "== $id"; head -1 h_$id.txt; wc -c list_$id.html
+          done
+          echo "== list 306002 lines"
+          grep -n -i -E 'view\.do|boardSeq|onclick|class="(tit|subject|title)' list_306002.html | head -80
+          U=$(grep -o -E 'view\.do[^"'"'"' <]*' list_306002.html | head -1 | sed 's/&amp;/\&/g')
+          echo "first view: $U"
+          [ -n "$U" ] && curl -sS -m 30 -A "$UA" -c jar -b jar "https://haedeun.icees.kr/boardCnts/$U" -o view.html
+          [ -f view.html ] && { wc -c view.html; grep -n -i -E '<img|fileDown|download|\.jpe?g|\.png' view.html | head -80; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: out, path: out }
