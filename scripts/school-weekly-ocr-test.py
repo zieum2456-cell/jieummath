@@ -66,9 +66,9 @@ def grid(img):
 def ocr_cell(img, box):
     x0, y0, x1, y1 = box
     pad = max(5, int(min(x1 - x0, y1 - y0) * 0.08))  # 칸 테두리 선이 글자로 읽히지 않게 안쪽만
-    crop = img.crop((x0 + pad, y0 + pad, x1 - pad, y1 - pad)).convert('L')
-    if crop.width < 8 or crop.height < 8:
+    if x1 - x0 < 2 * pad + 8 or y1 - y0 < 2 * pad + 8:  # 글자가 들어갈 수 없는 좁은 칸(겹줄 사이 등)
         return ''
+    crop = img.crop((x0 + pad, y0 + pad, x1 - pad, y1 - pad)).convert('L')
     a = np.asarray(crop)
     ys, xs = np.nonzero(a < 150)
     if len(ys) < 15:  # 빈 칸
@@ -250,8 +250,14 @@ def main():
     detail = []
     for name, plan, tt in jobs:
         print(f'{name} 읽는 중…', flush=True)
-        p_sum, p_cells = plan_test(Image.open(plan), f'{name}_주간학습계획')
-        t_sum, t_cells = timetable_test(Image.open(tt), f'{name}_학급별시간표')
+        try:
+            p_sum, p_cells = plan_test(Image.open(plan), f'{name}_주간학습계획')
+        except Exception as e:  # 한 학년이 실패해도 나머지 학년은 계속 시험한다
+            p_sum, p_cells = f'- 오류: {e!r}\n', ''
+        try:
+            t_sum, t_cells = timetable_test(Image.open(tt), f'{name}_학급별시간표')
+        except Exception as e:
+            t_sum, t_cells = f'- 오류: {e!r}\n', ''
         summary.append(f'## {name}\n\n### 주간학습계획\n{p_sum}\n### 학급별 시간표\n{t_sum}\n')
         detail.append(f'## {name} 주간학습계획 칸별 인식\n\n{p_cells}\n## {name} 학급별 시간표 칸별 인식\n\n{t_cells}\n')
 
