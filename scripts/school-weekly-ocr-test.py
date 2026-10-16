@@ -63,7 +63,7 @@ def grid(img):
     return rows, cols
 
 
-def ocr_cell(img, box):
+def ocr_cell(img, box, psm=None):
     x0, y0, x1, y1 = box
     pad = max(5, int(min(x1 - x0, y1 - y0) * 0.08))  # 칸 테두리 선이 글자로 읽히지 않게 안쪽만
     if x1 - x0 < 2 * pad + 8 or y1 - y0 < 2 * pad + 8:  # 글자가 들어갈 수 없는 좁은 칸(겹줄 사이 등)
@@ -81,7 +81,7 @@ def ocr_cell(img, box):
         crop = crop.resize((max(1, int(crop.width * s)), max(1, int(crop.height * s))), Image.LANCZOS)
     canvas = Image.new('L', (crop.width + 40, crop.height + 40), 255)
     canvas.paste(crop, (20, 20))
-    psm = '7' if text_h * s < 80 else '6'  # 한 줄이면 7, 여러 줄이면 6
+    psm = psm or ('7' if text_h * s < 80 else '6')  # 한 줄이면 7, 여러 줄이면 6
     txt = re.sub(r'\s+', ' ', pytesseract.image_to_string(canvas, lang='kor', config=f'--psm {psm}')).strip()
     if crop.width < crop.height * 1.6 and not re.search(r'[가-힣0-9]', txt):
         # 한 글자 칸(요일 등)은 글자 하나로 다시 읽어 본다
@@ -114,20 +114,43 @@ def cells_markdown(cells, rows, cols):
 
 # ---------- 1) 주간학습계획: 수학 칸 자르기 ----------
 
+NOTICE_RE = re.compile(r'가\s*정|통\s*신')
+
+
 def plan_test(img, name):
     rows, cols, cells = read_table(img)
     math = [x for x in cells if MATH_RE.search(x['text'])]
-    lines = [f'- 표 칸: 가로 {max(len(rows) - 1, 0)}줄 × 세로 {max(len(cols) - 1, 0)}칸', f'- "수학" 찾은 칸: {len(math)}개']
+    # 가정통신: 첫 칸에 '가정 / 통신' 두 줄로 적혀 있어 한 줄 읽기(psm 7)로는 못 읽는 경우가 많다
+    notice = []
+    for x in cells:
+        if x['c'] != 0:
+            continue
+        if not NOTICE_RE.search(x['text']):
+            x['text2'] = ocr_cell(img, x['box'], psm='6')
+            if not NOTICE_RE.search(x['text2']):
+                continue
+        notice.append(x)
+    lines = [f'- 표 칸: 가로 {max(len(rows) - 1, 0)}줄 × 세로 {max(len(cols) - 1, 0)}칸',
+             f'- "수학" 찾은 칸: {len(math)}개, "가정통신" 찾은 칸: {len(notice)}개']
+    left, right = (cols[0], cols[-1]) if cols else (0, img.width)
+    bands = []
+    for label, found in (('수학', math), ('가정통신', notice)):
+        if found:
+            bands.append((min(x['box'][1] for x in found), max(x['box'][3] for x in found)))
     if math:
-        left, right = cols[0], cols[-1]
-        top, bottom = rows[0], rows[-1]
-        r0 = min(x['box'][1] for x in math); r1 = max(x['box'][3] for x in math)
-        c0 = min(x['box'][0] for x in math); c1 = max(x['box'][2] for x in math)
-        row_crop = img.crop((left, r0, right, r1)); row_crop.save(os.path.join(OUT, f'{name}_수학_가로줄.png'))
-        col_crop = img.crop((c0, top, c1, bottom)); col_crop.save(os.path.join(OUT, f'{name}_수학_세로칸.png'))
-        lines.append(f'- 잘라 본 이미지: `{name}_수학_가로줄.png`(수학 칸이 있는 가로줄), `{name}_수학_세로칸.png`(수학 칸이 있는 세로칸)')
+        r0, r1 = bands[0]
+        img.crop((left, r0, right, r1)).save(os.path.join(OUT, f'{name}_수학_가로줄.png'))
         lines.append('- 수학 칸 내용: ' + ' / '.join(f'"{x["text"]}"' for x in math[:6]))
-    annotate(img, rows, cols, math, name)
+    if bands:
+        # 수학 줄과 가정통신 줄을 위아래로 이어 붙인 한 장 (최종 화면에 쓸 모양)
+        parts = [img.crop((left, r0, right, r1)) for r0, r1 in bands]
+        out = Image.new('RGB', (right - left, sum(p.height for p in parts)), 'white')
+        y = 0
+        for part in parts:
+            out.paste(part, (0, y)); y += part.height
+        out.save(os.path.join(OUT, f'{name}_수학_가정통신.png'))
+        lines.append(f'- 잘라 본 이미지: `{name}_수학_가정통신.png`' + (f', `{name}_수학_가로줄.png`' if math else ''))
+    annotate(img, rows, cols, math + notice, name)
     return '\n'.join(lines) + '\n', cells_markdown(cells, rows, cols)
 
 
@@ -183,11 +206,13 @@ def class_name(img, rows, cols, n_title):
     title = ocr_box(img, (cols[0], rows[0], cols[-1], rows[n_title]), psm='7') if n_title > 0 else ''
     corner = ocr_box(img, (cols[0], rows[n_title], cols[1], rows[n_title + 1]), psm='6')
     label = ' / '.join(t for t in (title, corner) if t)
-    m = re.fullmatch(r'\s*\d\s*[-–—]\s*(\d{1,2})\s*', title) or re.fullmatch(r'\s*(\d{1,2})\s*[반받밤발]\s*', corner)
+    m = (re.fullmatch(r'\s*\d\s*[-–—]\s*(\d{1,2})\s*', title)          # '3-1' (3·4학년)
+         or re.fullmatch(r'\s*(\d{1,2})\s*[반받밤발]\s*', title)           # '1반' (5학년)
+         or re.fullmatch(r'\s*(\d{1,2})\s*[반받밤발]\s*', corner))         # 머리줄 첫 칸 '1반' (6학년)
     if m:
         return int(m.group(1)), label, True
     # 번호만 못 읽은 경우('3-?', '4-ㅣ', '반'): 반 시간표로 보고 번호는 앞 블록 다음으로 추정
-    looks = bool(re.match(r'\s*\d\s*[-–—]', title)) or bool(re.fullmatch(r'\s*\d{0,2}\s*[반받밤발]?\s*', corner) and corner.strip())
+    looks = bool(re.match(r'\s*\d\s*[-–—]', title)) or bool(re.fullmatch(r'\s*\d{0,2}\s*[반받밤발]\s*', title)) or bool(re.fullmatch(r'\s*\d{0,2}\s*[반받밤발]?\s*', corner) and corner.strip())
     return None, label, looks
 
 
@@ -218,12 +243,13 @@ def glyph(img, box):
     return g / n if n else None
 
 
-MATCH = 0.6  # 머리줄 '수'(수요일) 글자와 이 이상 닮으면 수학으로 본다
+SEED = 0.45  # 1단계: 머리줄 '수'(수요일)와 이 이상 닮은 본문 칸을 모아 기준 모양을 만든다
+MATCH = 0.6  # 2단계: 기준 모양과 이 이상 닮으면 수학으로 본다
 
 
 def timetable_test(img, name):
     blocks, h, v = table_blocks(img)
-    found, report, marks, guesses = {}, [], [], set()
+    found, report, marks, guesses, parsed = {}, [], [], set(), []
     all_rows, all_cols = [], []
     skipped = 0
     for b in sorted(blocks, key=lambda b: (round(b[1] / 40), b[0])):
@@ -240,30 +266,45 @@ def timetable_test(img, name):
             continue
         guessed = k is None
         if guessed:
-            k = (max(found) if found else 0) + 1
+            k = (max(x[0] for x in parsed) if parsed else 0) + 1
         # 과목 글자는 OCR 대신, 같은 표 머리줄의 '수'(수요일) 글자 모양과 비교한다 (같은 글꼴이라 잘 맞는다)
         hr = n_r - 7
         tmpl = glyph(img, (cols[3], rows[hr], cols[4], rows[hr + 1]))
-        grid_txt = []
-        days = set()
+        cells = []
         for p in range(6):
             r = n_r - 6 + p
-            line = []
             for d in range(5):
                 box = (cols[d + 1], rows[r], cols[d + 2], rows[r + 1])
-                g = glyph(img, box)
-                sim = float((g * tmpl).sum()) if g is not None and tmpl is not None else None
-                line.append('  · ' if sim is None else f'{sim:4.2f}')
-                if sim is not None and sim >= MATCH:
-                    days.add(DAYS[d])
-                    marks.append({'box': box})
-            grid_txt.append(' '.join(line))
-        key = k
-        found[key] = days
+                cells.append((p, d, box, glyph(img, box)))
+        parsed.append((k, guessed, label, tmpl, cells))
+
+    def score(g, t):
+        return float((g * t).sum()) if g is not None and t is not None else None
+
+    # 2단계: 머리줄 '수'와 꽤 닮은 본문 칸들의 평균 모양을 새 기준으로 삼는다.
+    # (머리줄 글자가 본문보다 굵은 양식(5학년)에서도 본문 '수'끼리는 아주 닮았다)
+    pool = [g for _, _, _, t, cells in parsed for _, _, _, g in cells if (score(g, t) or 0) >= SEED]
+    ref = None
+    if len(pool) >= 3:
+        ref = np.mean(pool, axis=0)
+        ref = ref - ref.mean()
+        ref = ref / np.linalg.norm(ref)
+
+    for k, guessed, label, tmpl, cells in parsed:
+        grid = [[None] * 5 for _ in range(6)]
+        days = set()
+        for p, d, box, g in cells:
+            sim = score(g, ref if ref is not None else tmpl)
+            grid[p][d] = sim
+            if sim is not None and sim >= MATCH:
+                days.add(DAYS[d])
+                marks.append({'box': box})
+        found[k] = days
         if guessed:
-            guesses.add(key)
-        report.append(f'<details><summary>{key}반{" (번호 추정)" if guessed else ""} (반 이름 인식: "{label}")</summary>\n\n```\n월 화 수 목 금\n' +
-                      '\n'.join(grid_txt) + '\n```\n</details>')
+            guesses.add(k)
+        grid_txt = [' '.join('  · ' if x is None else f'{x:4.2f}' for x in row) for row in grid]
+        report.append(f'<details><summary>{k}반{" (번호 추정)" if guessed else ""} (반 이름 인식: "{label}")</summary>\n\n```\n'
+                      "'수'와 닮은 정도 (0.6 이상 = 수학)\n 월   화   수   목   금\n" + '\n'.join(grid_txt) + '\n```\n</details>')
     lines = [f'- 찾은 반 시간표 블록: {len(found)}개 (반 시간표가 아닌 표 {skipped}개 건너뜀)']
     if found:
         lines.append('\n| 반 | 수학 요일 |\n|---|---|')
