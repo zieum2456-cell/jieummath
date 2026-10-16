@@ -10,7 +10,7 @@ GitHub Actions에서는 요약이 실행 화면(Summary)에 바로 나온다.
 
 사용: python3 scripts/school-weekly-ocr-test.py [월요일 날짜 YYYY-MM-DD]
       python3 scripts/school-weekly-ocr-test.py --files 계획.jpg 시간표.jpg   (내려받은 이미지로 바로 시험)
-필요: tesseract-ocr, tesseract-ocr-kor, pip install pytesseract pillow numpy
+필요: tesseract-ocr, tesseract-ocr-kor, pip install pytesseract pillow numpy scipy
 """
 import json
 import os
@@ -82,7 +82,7 @@ def ocr_cell(img, box):
     canvas = Image.new('L', (crop.width + 40, crop.height + 40), 255)
     canvas.paste(crop, (20, 20))
     psm = '7' if text_h * s < 80 else '6'  # 한 줄이면 7, 여러 줄이면 6
-    txt = re.sub(r'\s+', ' ', pytesseract.image_to_string(canvas, lang='kor+eng', config=f'--psm {psm}')).strip()
+    txt = re.sub(r'\s+', ' ', pytesseract.image_to_string(canvas, lang='kor', config=f'--psm {psm}')).strip()
     if crop.width < crop.height * 1.6 and not re.search(r'[가-힣0-9]', txt):
         # 한 글자 칸(요일 등)은 글자 하나로 다시 읽어 본다
         txt = pytesseract.image_to_string(canvas, lang='kor', config='--psm 10').strip()
@@ -132,70 +132,148 @@ def plan_test(img, name):
 
 
 # ---------- 2) 학급별 시간표: 반별 수학 요일 ----------
+#
+# 학급별 시간표는 반마다 작은 표(블록)가 여러 개 놓인 양식이다.
+#   [제목 줄: '3-1' 같은 반 이름]   (6학년은 없음: 머리줄 첫 칸에 '1반')
+#   [머리줄: (반) 월 화 수 목 금]
+#   [1~6교시 6줄: 교시 번호 + 과목 첫 글자]
+# 그래서 페이지에서 표 블록을 하나씩 찾고, 블록마다 끝의 6줄 × 오른쪽 5칸을 요일·교시로 본다.
 
-def day_of(text):
-    t = text.replace(' ', '')
-    for d in DAYS:
-        if t == d or t.startswith(d + '(') or t.startswith(d + '요'):
-            return d
-    return None
+def table_blocks(img):
+    """페이지에서 테두리로 둘러싸인 작은 표 블록들의 (x0, y0, x1, y1)"""
+    from scipy import ndimage
+    g = np.asarray(img.convert('L'))
+    dark = g < 160
+    L = max(15, int(img.width * 0.04))  # 이보다 긴 가로/세로 획만 표 선으로 본다
+    h = ndimage.binary_opening(dark, structure=np.ones((1, L)))
+    v = ndimage.binary_opening(dark, structure=np.ones((L, 1)))
+    frame = h | v  # 붙어 있는 이웃 블록과 합쳐지지 않게 넓히지 않는다
+    labels, n = ndimage.label(frame)
+    blocks = []
+    for sl in ndimage.find_objects(labels):
+        y0, y1, x0, x1 = sl[0].start, sl[0].stop, sl[1].start, sl[1].stop
+        if x1 - x0 > img.width * 0.12 and y1 - y0 > img.height * 0.06:
+            blocks.append((x0, y0, x1, y1))
+    return blocks, h, v
+
+
+def merge_lines(idx):
+    out, start = [], None
+    for k, i in enumerate(idx):
+        if start is None:
+            start = i
+        if k + 1 == len(idx) or idx[k + 1] != i + 1:
+            out.append((start + i) // 2)
+            start = None
+    return out
+
+
+def block_grid(block, h, v):
+    x0, y0, x1, y1 = block
+    hs = h[y0:y1, x0:x1].sum(axis=1)
+    vs = v[y0:y1, x0:x1].sum(axis=0)
+    rows = [y0 + i for i in merge_lines([i for i, s in enumerate(hs) if s > (x1 - x0) * 0.5])]
+    cols = [x0 + i for i in merge_lines([i for i, s in enumerate(vs) if s > (y1 - y0) * 0.5])]
+    return rows, cols
+
+
+def class_name(img, rows, cols, n_title):
+    """블록의 반 번호: 제목 줄('3-1', '4-10') 또는 머리줄 첫 칸('1반', '10반').
+    돌려주는 값: (반 번호 또는 None, 읽은 글자, 반 시간표처럼 보이는지)"""
+    title = ocr_box(img, (cols[0], rows[0], cols[-1], rows[n_title]), psm='7') if n_title > 0 else ''
+    corner = ocr_box(img, (cols[0], rows[n_title], cols[1], rows[n_title + 1]), psm='6')
+    label = ' / '.join(t for t in (title, corner) if t)
+    m = re.fullmatch(r'\s*\d\s*[-–—]\s*(\d{1,2})\s*', title) or re.fullmatch(r'\s*(\d{1,2})\s*[반받밤발]\s*', corner)
+    if m:
+        return int(m.group(1)), label, True
+    # 번호만 못 읽은 경우('3-?', '4-ㅣ', '반'): 반 시간표로 보고 번호는 앞 블록 다음으로 추정
+    looks = bool(re.match(r'\s*\d\s*[-–—]', title)) or bool(re.fullmatch(r'\s*\d{0,2}\s*[반받밤발]?\s*', corner) and corner.strip())
+    return None, label, looks
+
+
+def ocr_box(img, box, psm):
+    x0, y0, x1, y1 = box
+    pad = 3
+    crop = img.crop((x0 + pad, y0 + pad, x1 - pad, y1 - pad)).convert('L')
+    s = max(1.0, 64 / max(crop.height, 1))
+    crop = crop.resize((int(crop.width * s), int(crop.height * s)), Image.LANCZOS)
+    canvas = Image.new('L', (crop.width + 40, crop.height + 40), 255)
+    canvas.paste(crop, (20, 20))
+    return re.sub(r'\s+', ' ', pytesseract.image_to_string(canvas, lang='kor', config=f'--psm {psm}')).strip()
+
+
+def glyph(img, box):
+    """칸 안 글자 모양을 24×24로 맞춘 정규화 벡터 (빈 칸이면 None)"""
+    x0, y0, x1, y1 = box
+    pad = max(3, int(min(x1 - x0, y1 - y0) * 0.12))
+    a = np.asarray(img.crop((x0 + pad, y0 + pad, x1 - pad, y1 - pad)).convert('L')).astype(float)
+    m = a < np.median(a) - 60  # 칸 바탕색보다 충분히 진한 부분 = 글자
+    if m.sum() < 8:
+        return None
+    ys, xs = np.nonzero(m)
+    m = m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    g = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).resize((24, 24), Image.BILINEAR)) / 255.0
+    g = g - g.mean()
+    n = np.linalg.norm(g)
+    return g / n if n else None
+
+
+MATCH = 0.6  # 머리줄 '수'(수요일) 글자와 이 이상 닮으면 수학으로 본다
 
 
 def timetable_test(img, name):
-    rows, cols, cells = read_table(img)
-    by_rc = {(x['r'], x['c']): x for x in cells}
-    headers = [x for x in cells if day_of(x['text'])]
-    # 요일을 3개 이상 읽은 줄은 못 읽은 요일 칸을 열 순서로 채운다 (예: '금'을 'a'로 읽은 경우)
-    for r in sorted({h['r'] for h in headers}):
-        row = sorted((h for h in headers if h['r'] == r), key=lambda h: h['c'])
-        if len(row) < 3:
+    blocks, h, v = table_blocks(img)
+    found, report, marks, guesses = {}, [], [], set()
+    all_rows, all_cols = [], []
+    skipped = 0
+    for b in sorted(blocks, key=lambda b: (round(b[1] / 40), b[0])):
+        rows, cols = block_grid(b, h, v)
+        n_r, n_c = len(rows) - 1, len(cols) - 1
+        if n_c != 6 or n_r < 7:  # 반 시간표가 아닌 표(영어·음악 전담 등)는 건너뜀
+            skipped += 1
             continue
-        base = row[0]['c'] - DAYS.index(day_of(row[0]['text']))
-        for i, d in enumerate(DAYS):
-            x = by_rc.get((r, base + i))
-            if x and not day_of(x['text']):
-                x['text'] = f'{d}(추정:{x["text"]})'
-                headers.append(x)
-    classes = [x for x in cells if CLASS_RE.search(x['text'])]
-    math = [x for x in cells if MATH_RE.search(x['text']) or x['text'].replace(' ', '') == '수학']
-
-    def header_day(cell):
-        # 같은 열에서 위쪽으로 가장 가까운 요일 머리칸
-        ups = [h for h in headers if h['c'] == cell['c'] and h['r'] < cell['r']]
-        return day_of(max(ups, key=lambda h: h['r'])['text']) if ups else None
-
-    def class_of(cell):
-        # 같은 줄 왼쪽의 'n반' 칸, 없으면 위쪽에서 가장 가까운 'n반' 칸
-        same_row = [k for k in classes if k['r'] == cell['r'] and k['c'] < cell['c']]
-        if same_row:
-            return CLASS_RE.search(max(same_row, key=lambda k: k['c'])['text']).group(1)
-        above = [k for k in classes if k['r'] < cell['r']]
-        if above:
-            k = min(above, key=lambda k: (cell['r'] - k['r'], abs(cell['c'] - k['c'])))
-            return CLASS_RE.search(k['text']).group(1)
-        return None
-
-    found = {}
-    unknown = []
-    for m in math:
-        d, k = header_day(m), class_of(m)
-        if d and k:
-            found.setdefault(int(k), set()).add(d)
-        else:
-            unknown.append(m)
-
-    lines = [f'- 표 칸: 가로 {max(len(rows) - 1, 0)}줄 × 세로 {max(len(cols) - 1, 0)}칸',
-             f'- 읽은 요일 머리칸 {len(headers)}개, "n반" 칸 {len(classes)}개, "수학" 칸 {len(math)}개']
+        all_rows += rows; all_cols += cols
+        n_title = n_r - 7
+        k, label, looks = class_name(img, rows, cols, n_title)
+        if k is None and not looks:  # 반 이름이 없는 표(영어·음악 전담, 강당 등)는 반 시간표가 아님
+            skipped += 1
+            continue
+        guessed = k is None
+        if guessed:
+            k = (max(found) if found else 0) + 1
+        # 과목 글자는 OCR 대신, 같은 표 머리줄의 '수'(수요일) 글자 모양과 비교한다 (같은 글꼴이라 잘 맞는다)
+        hr = n_r - 7
+        tmpl = glyph(img, (cols[3], rows[hr], cols[4], rows[hr + 1]))
+        grid_txt = []
+        days = set()
+        for p in range(6):
+            r = n_r - 6 + p
+            line = []
+            for d in range(5):
+                box = (cols[d + 1], rows[r], cols[d + 2], rows[r + 1])
+                g = glyph(img, box)
+                sim = float((g * tmpl).sum()) if g is not None and tmpl is not None else None
+                line.append('  · ' if sim is None else f'{sim:4.2f}')
+                if sim is not None and sim >= MATCH:
+                    days.add(DAYS[d])
+                    marks.append({'box': box})
+            grid_txt.append(' '.join(line))
+        key = k
+        found[key] = days
+        if guessed:
+            guesses.add(key)
+        report.append(f'<details><summary>{key}반{" (번호 추정)" if guessed else ""} (반 이름 인식: "{label}")</summary>\n\n```\n월 화 수 목 금\n' +
+                      '\n'.join(grid_txt) + '\n```\n</details>')
+    lines = [f'- 찾은 반 시간표 블록: {len(found)}개 (반 시간표가 아닌 표 {skipped}개 건너뜀)']
     if found:
         lines.append('\n| 반 | 수학 요일 |\n|---|---|')
         for k in sorted(found):
-            lines.append(f'| {k}반 | {", ".join(d for d in DAYS if d in found[k])} |')
+            lines.append(f'| {k}반{" (번호 추정)" if k in guesses else ""} | {", ".join(d for d in DAYS if d in found[k]) or "-"} |')
+        lines.append('\n블록별로 읽은 과목 글자:\n\n' + '\n'.join(report))
     else:
-        lines.append('- 반별 수학 요일을 뽑지 못했습니다.')
-    if unknown:
-        lines.append(f'- 반이나 요일을 못 정한 "수학" 칸 {len(unknown)}개 (줄,칸): ' + ', '.join(f'({u["r"]},{u["c"]})' for u in unknown[:20]))
-    annotate(img, rows, cols, math, name)
-    return '\n'.join(lines) + '\n', cells_markdown(cells, rows, cols)
+        lines.append('- 반 시간표 블록을 찾지 못했습니다.')
+    annotate(img, sorted(set(all_rows)), sorted(set(all_cols)), marks, name)
+    return '\n'.join(lines) + '\n', ''
 
 
 # ---------- 공통 ----------

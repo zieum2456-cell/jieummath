@@ -12,6 +12,7 @@
  *   3장: 주간학습계획, 학급별 시간표, 교과별 시간표
  *   2장: 주간학습계획, 학급별+교과별 시간표
  * 어느 경우든 앞의 2장(주간학습계획, 학급별 시간표)만 쓴다.
+ * 단 5학년은 3장(주간학습계획, 전담 시간표, 반별 시간표)이라 1번째와 3번째를 쓴다(BOARDS의 timetableIndex).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -23,7 +24,7 @@
   const BOARDS = [
     { grade: 3, boardID: '306002', m: '020503' },
     { grade: 4, boardID: '306004', m: '020504' },
-    { grade: 5, boardID: '306006', m: '020505' },
+    { grade: 5, boardID: '306006', m: '020505', timetableIndex: 2 }, // 5학년은 세 번째 이미지가 반별 시간표
     { grade: 6, boardID: '306008', m: '020506' },
   ];
   const KEEP_IMAGES = 2;
@@ -115,7 +116,10 @@
     return urls;
   }
 
-  function pickImages(urls) {
+  // [주간학습계획, 학급별 시간표]. 시간표 위치가 다른 게시판은 board.timetableIndex로 정한다(없으면 앞에서 가까운 것).
+  function pickImages(urls, board) {
+    const t = board && board.timetableIndex;
+    if (t && urls.length > t) return [urls[0], urls[t]];
     return urls.slice(0, KEEP_IMAGES);
   }
 

@@ -65,7 +65,7 @@ async function main() {
       let images = prev ? prev.images : null;
       if (!prev || week >= recentFrom || !images || !images.length) {
         try {
-          images = SW.pickImages(SW.parseImages(await get(url)));
+          images = SW.pickImages(SW.parseImages(await get(url)), board);
         } catch (e) {
           errors.push(`${board.grade}학년 "${item.title}": ${e.message}`);
           if (!images) images = [];

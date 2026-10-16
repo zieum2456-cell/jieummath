@@ -68,6 +68,13 @@ test('본문 이미지 2장이면 2장 모두, 상대 주소는 사이트 주소
   ]);
 });
 
+test('5학년은 첫 번째와 세 번째 이미지(반별 시간표)를 쓰고, 2장뿐이면 앞의 2장', () => {
+  const g5 = SW.BOARDS.find((b) => b.grade === 5);
+  assert.deepEqual(SW.pickImages(['a', 'b', 'c'], g5), ['a', 'c']);
+  assert.deepEqual(SW.pickImages(['a', 'b'], g5), ['a', 'b']);
+  assert.deepEqual(SW.pickImages(['a', 'b', 'c'], SW.BOARDS.find((b) => b.grade === 3)), ['a', 'b']);
+});
+
 test('같은 주차끼리 묶고 최신 주가 먼저, 같은 주 같은 학년은 나중 글', () => {
   const weeks = SW.groupWeeks([
     { grade: 3, seq: '10', title: 'a', week: '2026-10-12', images: ['1'] },
