@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주간학습안내 모아보기</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1f2328; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #2563eb; --accent-soft: #e8efff; --danger: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111418; --card: #1a1e24; --text: #e6e8eb; --muted: #9aa3ad; --line: #2c323a;
+      --accent: #6b9bff; --accent-soft: #1f2a44; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 16px; position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; }
+  .nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  select { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  button.btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button.btn:disabled { opacity: .4; cursor: default; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .err { color: var(--danger); }
+  .grade { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px 16px; margin-bottom: 16px; }
+  .grade-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .grade-head h2 { margin: 0; font-size: 18px; color: var(--accent); }
+  .grade-head a { color: var(--muted); font-size: 13px; }
+  .imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .imgs { grid-template-columns: 1fr; } }
+  figure { margin: 0; min-width: 0; }
+  figcaption { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; }
+  @media print {
+    header, .no-print { display: none !important; }
+    body { background: #fff; }
+    main { max-width: none; padding: 0; }
+    .grade { border: 0; padding: 0; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>주간학습안내 모아보기</h1>
+  <div class="nav">
+    <button class="btn" id="btn-prev" title="이전 주">◀</button>
+    <select id="week" aria-label="주 선택"></select>
+    <button class="btn" id="btn-next" title="다음 주">▶</button>
+  </div>
+</header>
+
+<main>
+  <div id="list"><p class="muted">불러오는 중…</p></div>
+  <p class="muted no-print" id="info"></p>
+</main>
+
+<script src="school-weekly.js?v=20261016"></script>
+<script src="school-weekly-app.js?v=20261016"></script>
+</body>
+</html>
