@@ -17,7 +17,10 @@ const RECENT_WEEKS = 3;
 async function get(url) {
   for (let i = 0; ; i++) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) });
+      const res = await fetch(url, {
+        headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,*/*;q=0.8', 'Accept-Language': 'ko-KR,ko;q=0.9' },
+        signal: AbortSignal.timeout(30000),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.text();
     } catch (e) {
@@ -45,7 +48,9 @@ async function main() {
   for (const board of SW.BOARDS) {
     let list;
     try {
-      list = SW.parseList(await get(SW.listUrl(board, 1)));
+      const html = await get(SW.listUrl(board, 1));
+      list = SW.parseList(html);
+      if (!list.length) console.log(`${board.grade}학년 목록 응답 ${html.length}자: ${html.replace(/\s+/g, ' ').slice(0, 400)}`);
     } catch (e) {
       errors.push(`${board.grade}학년 목록: ${e.message}`);
       continue;
@@ -73,6 +78,12 @@ async function main() {
   }
 
   const weeks = SW.groupWeeks(posts);
+  if (!weeks.length) {
+    console.log('::error::모은 게시물이 없어 저장하지 않습니다');
+    for (const e of errors) console.log(`::warning::${e}`);
+    process.exitCode = 1;
+    return;
+  }
   const data = { weeks };
   const before = JSON.stringify({ weeks: old.weeks || [] });
   if (JSON.stringify(data) !== before || !old.updatedAt) {
