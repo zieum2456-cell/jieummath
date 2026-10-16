@@ -1,0 +1,34 @@
+# 주간학습안내 이미지를 무료 OCR(tesseract)로 읽어 보는 테스트. 저장소에는 아무것도 커밋하지 않는다.
+# GitHub Actions 탭 → "주간학습안내 OCR 테스트" → Run workflow 로 실행하고, 결과는 실행 화면의 Summary와 Artifacts(ocr-test)에서 본다.
+name: 주간학습안내 OCR 테스트
+
+on:
+  workflow_dispatch:
+    inputs:
+      monday:
+        description: '시험할 주의 월요일 (예: 2026-10-19, 비우면 가장 최근 주)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  ocr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: tesseract 설치
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q tesseract-ocr tesseract-ocr-kor
+          pip install -q pytesseract pillow numpy
+      - name: OCR 테스트
+        env:
+          MONDAY: ${{ inputs.monday }}
+        run: python3 scripts/school-weekly-ocr-test.py $MONDAY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ocr-test
+          path: ocr-test/
