@@ -7,22 +7,17 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: fetch
+      - name: hotlink + page2
         run: |
-          mkdir out; cd out
-          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36'
-          B=https://haedeun.icees.kr
-          for b in 306002:020503 306004:020504 306006:020505 306008:020506; do
-            id=${b%%:*}; m=${b##*:}
-            curl -sS -m 30 -A "$UA" "$B/boardCnts/list.do?boardID=$id&m=$m&s=haden" -o list_$id.html
-            echo "== $id titles"; grep -o -E 'id="subject_[0-9]+"[^>]*title="[^"]*"' list_$id.html | sed -E 's/.*subject_([0-9]+).*title="([^"]*)"/\1 | \2/'
-            echo "== $id paging"; grep -n -i -E 'goPage|page=|class="(paging|pagination)' list_$id.html | head -8
-            seq=$(grep -o -E 'subject_[0-9]+' list_$id.html | head -1 | cut -d_ -f2)
-            curl -sS -m 30 -A "$UA" -c jar_$id -b jar_$id -e "$B/boardCnts/list.do?boardID=$id&m=$m&s=haden" "$B/boardCnts/view.do?boardID=$id&viewBoardID=$id&boardSeq=$seq&lev=0&action=view&searchType=S&statusYN=W&page=1&m=$m&s=haden" -o view_$id.html
-            echo "== $id view $seq"; wc -c view_$id.html
-            grep -n -i -E '<img|fileDown|download|\.jpe?g|\.png|\.gif|첨부' view_$id.html | grep -v -i -E 'common|/images/(main|sub|layout|btn|icon)|logo' | head -40
+          IMG=https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261016_091201853_86466.jpg
+          for r in none https://zieum2456-cell.github.io/jieummath/school-weekly.html; do
+            echo "== referer $r"
+            if [ $r = none ]; then curl -sS -m 30 -o /dev/null -w '%{http_code} %{content_type} %{size_download}\n' -D - $IMG | grep -i -E '^HTTP|content-type|access-control|cross-origin|x-frame'
+            else curl -sS -m 30 -e "$r" -o /dev/null -w '%{http_code} %{content_type} %{size_download}\n' $IMG; fi
           done
-          echo "== raw view 306002 head"; sed -n '1,40p' view_306002.html | cut -c1-300
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: { name: out, path: out }
+          echo "== page 2 of 306002"
+          curl -sS -m 30 "https://haedeun.icees.kr/boardCnts/list.do?boardID=306002&m=020503&s=haden&page=2" | grep -o -E 'id="subject_[0-9]+"[^>]*title="[^"]*"' | head -3
+          echo "== pagination html"
+          curl -sS -m 30 "https://haedeun.icees.kr/boardCnts/list.do?boardID=306002&m=020503&s=haden" | sed -n '/class="pagination"/,/<\/div>/p' | head -20
+          echo "== content cell context"
+          curl -sS -m 30 "https://haedeun.icees.kr/boardCnts/view.do?boardID=306008&viewBoardID=306008&boardSeq=34251578&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020506&s=haden" | sed -n '2875,2900p' | cut -c1-400
