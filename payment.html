@@ -158,9 +158,18 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2>이번 회차 수업 일정</h2>
-        <table><thead><tr><th>회차</th><th>날짜</th><th>비고</th></tr></thead><tbody id="sess"></tbody></table>
+      <div>
+        <div class="card">
+          <h2>이번 회차 수업 일정</h2>
+          <table><thead><tr><th>회차</th><th>날짜</th><th>비고</th></tr></thead><tbody id="sess"></tbody></table>
+        </div>
+
+        <div class="card">
+          <h2>메모</h2>
+          <p class="muted">나만 보는 메모입니다. 결제 안내 메시지나 명단에는 들어가지 않고, 입력하면 바로 저장됩니다.</p>
+          <textarea id="d-note" style="min-height:120px" placeholder="예: 상담 내용, 진도 메모"></textarea>
+          <span class="muted" id="d-note-state"></span>
+        </div>
       </div>
     </div>
   </section>

@@ -164,6 +164,10 @@
       .map((x) => `<tr class="${x.date > today ? 'future' : ''}"><td>${x.no}</td><td>${P.fmtMDW(x.date)}</td><td>${x.note}</td></tr>`)
       .join('');
 
+    // 나만 보는 메모 (입력 중에는 덮어쓰지 않음)
+    if (document.activeElement !== $('d-note')) $('d-note').value = s.note || '';
+    $('d-note-state').textContent = '';
+
     // 등록 내역
     const evs = (s.events || [])
       .filter((ev) => ev.date >= s.startDate || (ev.toDate && ev.toDate >= s.startDate))
@@ -250,6 +254,14 @@
     $('copy-state').textContent = '복사했습니다.';
   });
   $('regen').addEventListener('click', renderDetail);
+
+  $('d-note').addEventListener('input', () => {
+    const s = findStudent(currentId);
+    if (!s) return;
+    s.note = $('d-note').value;
+    save();
+    $('d-note-state').textContent = '저장됨';
+  });
 
   $('advance').addEventListener('click', () => {
     const s = findStudent(currentId);
