@@ -126,10 +126,7 @@ def band_of(el):
 fonts = {}
 
 
-def text_path(text, x, baseline, weight, size, space):
-    """글자를 SVG 경로로 (글꼴 없이도 똑같이 찍히게)"""
-    from fontTools.pens.svgPathPen import SVGPathPen
-    from fontTools.pens.transformPen import TransformPen
+def font_of(weight):
     from fontTools.ttLib import TTFont
     if weight not in fonts:
         FONT_DIR.mkdir(parents=True, exist_ok=True)
@@ -137,7 +134,20 @@ def text_path(text, x, baseline, weight, size, space):
         if not f.exists():
             urllib.request.urlretrieve(FONTS[weight], f)
         fonts[weight] = TTFont(f)
-    font = fonts[weight]
+    return fonts[weight]
+
+
+def text_width(text, weight, size, space):
+    font = font_of(weight)
+    cmap, hmtx = font.getBestCmap(), font['hmtx']
+    return sum(space if ch == ' ' else hmtx[cmap[ord(ch)]][0] * size / 1000 for ch in text)
+
+
+def text_path(text, x, baseline, weight, size, space):
+    """글자를 SVG 경로로 (글꼴 없이도 똑같이 찍히게)"""
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.transformPen import TransformPen
+    font = font_of(weight)
     gs, cmap, hmtx = font.getGlyphSet(), font.getBestCmap(), font['hmtx']
     k = size / 1000
     pen = SVGPathPen(gs, ntos=lambda v: ('%.2f' % v).rstrip('0').rstrip('.'))
@@ -161,17 +171,48 @@ CHOICES = ['개념 재학습/오개념 수정', '문제 읽기(조건 찾기)', 
 mistake_text = text_path('학습 주안점', LABEL[0], LABEL[1], 'B', 6.996 / 0.92, 1.98) + ''.join(
     text_path(t, COLS[k % 2], ROWS[k // 2], 'R', 6.882 / 0.92, 2.12) for k, t in enumerate(CHOICES))
 
+# 지난 과제 칸: 보기 6개를 칸 너비에 고르게 다시 놓는다 (동그라미는 원래 첫 동그라미를 옮겨 쓴다)
+hw = next((a, b) for a, b in zip(dividers, dividers[1:]) if 118 < a < 119)
+HW_CHOICES = ['완료', '50% 이상', '50% 미만', '안 함', '두고 옴', '과제 없음']
+HW_X0, HW_X1, HW_BASE = 59.22, 266.17, hw[0] + 16.39  # 첫 동그라미 왼쪽, 칸 오른쪽 끝, 보기 글자 기준선
+HW_GAP = 7.8  # 동그라미 왼쪽 → 글자 시작 (원래 8.9, 보기가 6개라 조금 줄임)
+HW_SPACE = 5  # 보기 사이 최소 간격
+# 보기가 한 줄에 들어가도록 글자 크기를 원래(6.88pt 간격)에서 필요한 만큼만 줄인다
+hw_size = 6.882 / 0.92
+room = HW_X1 - HW_X0 - HW_SPACE * (len(HW_CHOICES) - 1) - HW_GAP * len(HW_CHOICES)
+hw_size *= min(1, room / sum(text_width(t, 'R', hw_size, 2.12) for t in HW_CHOICES))
+hw_sp = 2.12 * hw_size / (6.882 / 0.92)
+widths = [HW_GAP + text_width(t, 'R', hw_size, hw_sp) for t in HW_CHOICES]
+space = (HW_X1 - HW_X0 - sum(widths)) / (len(HW_CHOICES) - 1)
+hw_bubble = None
+hw_text = ''
+hw_x = []
+x = HW_X0
+for t, w in zip(HW_CHOICES, widths):
+    hw_x.append(x)
+    hw_text += text_path(t, x + HW_GAP, HW_BASE, 'R', hw_size, hw_sp)
+    x += w + space
+
 parts = {name: [] for name in OLD}
 body = ''
 for c in card:
     name = band_of(c)
-    if name is None:
+    t = top_y(c)
+    if name is None and t is not None and hw[0] + 0.1 < t <= hw[1] + 0.1:
+        if c.tag == SVG + 'path' and c.get('transform'):
+            hw_bubble = hw_bubble or emit(c)  # 보기 동그라미
+            continue
+        if c.tag == SVG + 'g' and float(c.find(SVG + 'use').get('x')) > 55:
+            continue  # 옛 보기 글자
+        body += emit(c)
+    elif name is None:
         body += emit(c)
     elif name == 'mistake' and c.tag == SVG + 'g':
         continue  # 옛 글자(오답 원인, 계산 실수 …)는 버린다
     else:
         parts[name].append(emit(c))
 parts['mistake'].append(mistake_text)
+body += hw_text + ''.join('<g transform="translate(%.2f,0)">%s</g>' % (x - HW_X0, hw_bubble) for x in hw_x)
 for name in NEW:
     body += '<g transform="translate(0,%.2f)">%s</g>' % (shift[name], ''.join(parts[name]))
 

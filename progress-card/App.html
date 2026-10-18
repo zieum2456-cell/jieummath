@@ -1055,7 +1055,7 @@
     return `<div class="stats">
       <div class="stat"><div class="k">수업</div><div class="v">${st.count}회</div><div class="s">정규 ${a.정규} · 보강 ${a.보강} · 결강 ${a.결강}</div></div>
       <div class="stat"><div class="k">과제 완료율</div><div class="v">${pct(h.rate)}</div>
-        <div class="s">완료 ${hc.완료} · 미완 ${hc.미완} · 안 함 ${hc['안 함']} · ${left} ${hc['두고 옴']} (과제 없음 ${hc['과제 없음']})</div></div>
+        <div class="s">완료 ${hc.완료} · 50% 이상 ${hc['50% 이상']} · 50% 미만 ${hc['50% 미만']}${hc.미완 ? ` · 미완 ${hc.미완}` : ''} · 안 함 ${hc['안 함']} · ${left} ${hc['두고 옴']} (과제 없음 ${hc['과제 없음']})</div></div>
       <div class="stat"><div class="k">추가 포인트</div><div class="v">${st.points}점</div></div>
       <div class="stat"><div class="k">평균 수업시간</div><div class="v">${st.avgMinutes == null ? '-' : st.avgMinutes + '분'}</div><div class="s">결강 제외</div></div>
     </div>

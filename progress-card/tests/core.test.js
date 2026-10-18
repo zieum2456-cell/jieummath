@@ -31,6 +31,12 @@ test('옛 양식 CSV(오답원인 열)는 학습주안점과 새 보기 이름�
   assert.equal(fresh.cards[0].values.학습주안점, '풀이 과정 서술; 계산 실수 교정');
 });
 
+test('지난과제: 새 보기(50% 이상/미만)와 옛 카드의 미완은 통과, 없는 값은 오류', () => {
+  const csv = (x) => C.readCsv('c.csv', C.HEADERS.join(',') + '\n' + C.HEADERS.map((h) => (h === '지난과제' ? x : '')).join(','));
+  ['50% 이상', '50% 미만', '미완'].forEach((x) => assert.deepEqual(issuesOf(csv(x).cards[0]).filter((i) => i.field === '지난과제'), []));
+  assert.equal(issuesOf(csv('반쯤').cards[0]).filter((i) => i.field === '지난과제').length, 1);
+});
+
 test('샘플 CSV: 도윤 카드가 맨 위(확인필요), 나머지 문제없음', () => {
   const r = sample();
   const ranked = r.cards.map((c) => ({ c, rank: C.rankOf(c.values, issuesOf(c)) }));
@@ -185,15 +191,18 @@ test('기간 단추', () => {
   assert.equal(C.weekday('2026-10-09'), '금');
 });
 
-test('과제 완료율: (완료 + 미완×0.5) / 과제 없음을 뺀 횟수, 두고 옴은 설정대로', () => {
-  const rs = ['완료', '완료', '미완', '안 함', '두고 옴', '과제 없음', ''].map((x, i) => rec(`2026-10-0${i + 1}`, { 지난과제: x }));
+test('과제 완료율: (완료 + 50% 이상×0.7 + 50% 미만×0.3) / 과제 없음을 뺀 횟수, 두고 옴은 설정대로', () => {
+  const rs = ['완료', '50% 이상', '50% 미만', '안 함', '두고 옴', '과제 없음', ''].map((x, i) => rec(`2026-10-0${i + 1}`, { 지난과제: x }));
   const zero = C.homework(rs, '안 함과 같이(×0)');
   assert.equal(zero.denom, 5);
-  assert.equal(zero.rate, 2.5 / 5);
-  assert.equal(C.homework(rs, '미완과 같이(×0.5)').rate, 3 / 5);
+  assert.ok(Math.abs(zero.rate - 2 / 5) < 1e-9);
+  assert.ok(Math.abs(C.homework(rs, '절반만 인정(×0.5)').rate - 2.5 / 5) < 1e-9);
+  assert.ok(Math.abs(C.homework(rs, '미완과 같이(×0.5)').rate - 2.5 / 5) < 1e-9);
   const ex = C.homework(rs, '계산에서 제외');
   assert.equal(ex.denom, 4);
-  assert.equal(ex.rate, 2.5 / 4);
+  assert.ok(Math.abs(ex.rate - 2 / 4) < 1e-9);
+  // 옛 기록의 미완은 ×0.5
+  assert.equal(C.homework([rec('2026-10-01', { 지난과제: '미완' }), rec('2026-10-02', { 지난과제: '완료' })], '').rate, 1.5 / 2);
   assert.equal(C.homework([rec('2026-10-01', { 지난과제: '과제 없음' })], '').rate, null);
 });
 
