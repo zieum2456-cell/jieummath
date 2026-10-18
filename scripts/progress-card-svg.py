@@ -6,7 +6,8 @@ progress-card/CardSvg.html 을 만든다. (인쇄 탭이 이 양식 위에 학�
 
 PDF 양식에서 바꾸는 것 (2026-10-18 요청)
 - '오답 원인' 칸 → '학습 주안점' (보기: 개념 재학습/오개념 수정, 문제 읽기(조건 찾기), 계산 실수 교정, 풀이 과정 서술)
-- 학습 목표 아래 순서: 추가 포인트 → 오늘 과제 → 학습 주안점 → 학습태도
+- 학습 목표 아래 순서: 추가 포인트 → 오늘 과제 → 학습 주안점 → 지음쌤 톡
+- '학습태도' 칸 이름 → '지음쌤 톡' (기록 열 이름은 그대로 학습태도)
 새 글자는 Noto Sans KR(PDF 양식과 같은 글꼴 계열)에서 글자 모양을 뽑아 넣는다. 글꼴은 처음 실행할 때 내려받는다.
 
   pip install fonttools
@@ -250,9 +251,12 @@ for c in card:
         body += emit(c)
     elif name == 'mistake' and c.tag == SVG + 'g':
         continue  # 옛 글자(오답 원인, 계산 실수 …)는 버린다
+    elif name == 'attitude' and c.tag == SVG + 'g' and float(c.find(SVG + 'use').get('x')) < 55:
+        continue  # 옛 칸 이름 '학습태도'
     else:
         parts[name].append(emit(c))
 parts['mistake'].append(mistake_text)
+parts['attitude'].append(text_path('지음쌤 톡', 17.54, band['attitude'][0] + 15.67, 'B', 6.996 / 0.92, 1.98))
 body += stage_text + att_text + hw_text + ''.join('<g transform="translate(%.2f,0)">%s</g>' % (x - HW_X0, hw_bubble) for x in hw_x)
 for name in NEW:
     body += '<g transform="translate(0,%.2f)">%s</g>' % (shift[name], ''.join(parts[name]))
