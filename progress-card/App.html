@@ -738,6 +738,7 @@
       <label>디딤돌 레벨<select data-f="level">${opt(C.LEVELS, s.level, '-')}</select></label>
       <label>발송 조<select data-f="group">${opt(C.GROUPS, s.group, '-')}</select></label>
       <label>상태<select data-f="status">${opt(['재원', '퇴원'], s.status || '재원')}</select></label>
+      <label class="wide">등원 시각<input data-f="times" value="${esc(s.times || '')}" placeholder="화 16:00, 목 16:00" autocomplete="off"></label>
       <label class="wide">메모<input data-f="memo" value="${esc(s.memo)}" autocomplete="off"></label></div>
       <div class="row"><button class="btn small primary" data-edit-save="${isNew ? 'new' : esc(s.no)}">저장</button>
       <button class="btn small" data-edit-cancel>취소</button>
@@ -749,7 +750,7 @@
     $('roster-count').textContent = `(재원 ${list.filter((s) => s.status !== '퇴원').length}명)`;
     const rows = list.map((s) => {
       if (S.editNo === s.no) return editRow(s, false);
-      return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td><td>${esc(s.days)}</td>
+      return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td><td>${esc(s.days)}${s.times ? `<div class="muted small">${esc(s.times)}</div>` : ''}</td>
           <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td><td class="muted">${esc(s.memo)}</td>
           <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button> <button class="btn small danger" data-del="${esc(s.no)}">삭제</button></td></tr>`
           + (S.del && S.del.no === s.no ? `<tr><td colspan="9" style="white-space:normal"><div class="notice warn" style="margin:0">
@@ -813,7 +814,7 @@
     busy('저장 중…');
     try {
       S.roster = await run('api_saveStudent', {
-        isNew, no, name: val('name'), grade: val('grade'), level: val('level'), group: val('group'), status: val('status'), memo: val('memo'),
+        isNew, no, name: val('name'), grade: val('grade'), level: val('level'), group: val('group'), status: val('status'), memo: val('memo'), times: val('times'),
       });
       S.editNo = null;
       revalidate();
@@ -910,8 +911,8 @@
     if (d.noNumber && d.noNumber.length) html += `<div class="muted" style="color:var(--warn)">학생번호가 없어 건너뛴 학생: ${d.noNumber.map(esc).join(', ')}</div>`;
     if (d.invalid && d.invalid.length) html += `<div class="muted" style="color:var(--warn)">읽지 못한 줄: ${d.invalid.map((x) => `${x.line}번째 줄 "${esc(x.text)}"(${esc(x.reason)})`).join(', ')}</div>`;
     html += '<ul class="diff-list">';
-    html += d.add.map((s) => item('add', s.no, `<span class="badge ok">추가</span> ${esc(s.no)} ${esc(s.name)} ${esc(s.grade)} ${esc(s.days)}`, true)).join('');
-    html += d.update.map((u) => item('update', u.no, `<span class="badge warn">변경</span> ${esc(u.no)} ${esc(u.from.name)} ${esc(u.from.grade)} ${esc(u.from.days)}${u.from.status === '퇴원' ? '(퇴원)' : ''} → <b>${esc(u.to.name)} ${esc(u.to.grade)} ${esc(u.to.days)}</b>`, true)).join('');
+    html += d.add.map((s) => item('add', s.no, `<span class="badge ok">추가</span> ${esc(s.no)} ${esc(s.name)} ${esc(s.grade)} ${esc(s.days)} ${esc(s.times || '')}`, true)).join('');
+    html += d.update.map((u) => item('update', u.no, `<span class="badge warn">변경</span> ${esc(u.no)} ${esc(u.from.name)} ${esc(u.from.grade)} ${esc(u.from.days)} ${esc(u.from.times)}${u.from.status === '퇴원' ? '(퇴원)' : ''} → <b>${esc(u.to.name)} ${esc(u.to.grade)} ${esc(u.to.days)} ${esc(u.to.times)}</b>`, true)).join('');
     html += d.missing.map((s) => item('retire', s.no, `<span class="badge off">불러온 명단에 없음</span> ${esc(s.no)} ${esc(s.name)} → 퇴원으로 표시`, false)).join('');
     html += '</ul>';
     const n = d.add.length + d.update.length + d.missing.length;
@@ -930,7 +931,7 @@
       const upd = picked('update');
       const change = {
         add: d.add.filter((s) => add.indexOf(s.no) >= 0),
-        update: d.update.filter((u) => upd.indexOf(u.no) >= 0).map((u) => ({ no: u.no, name: u.to.name, grade: u.to.grade, days: u.to.days })),
+        update: d.update.filter((u) => upd.indexOf(u.no) >= 0).map((u) => ({ no: u.no, name: u.to.name, grade: u.to.grade, days: u.to.days, times: u.to.times })),
         retire: picked('retire'),
       };
       busy('명단 반영 중…');
@@ -1120,6 +1121,38 @@
     $('stu-summary').innerHTML = `<div class="card"><h2>${esc(S.stuNo)} ${esc(st ? st.name : '')} <span class="muted">${esc([st && st.grade, st && st.level, st && st.group ? st.group + '조' : ''].filter(Boolean).join(' · '))}</span></h2>
       <div class="muted" style="margin:-6px 0 10px">${range}</div>${statsHtml(C.summarize(recs, { leftMode: leftMode() }))}</div>`;
     $('stu-timeline').innerHTML = recs.length ? recs.map((r) => entryHtml(r, false)).join('') : '<div class="empty">이 기간에 저장된 기록이 없습니다.</div>';
+    renderReport(st, recs);
+  }
+
+  /* 학부모 2주 리포트: 기록으로 문구를 만들고, 지음쌤 한마디만 직접 적는다 */
+  const reportText = (st, recs) => C.parentReport({ name: st ? st.name : '', times: st ? st.times : '' }, recs,
+    { from: S.period.from, to: S.period.to, leftMode: leftMode(), note: store.get('note-' + S.stuNo) || '' });
+  function renderReport(st, recs) {
+    if (!recs.length) return ($('stu-report').innerHTML = '');
+    const talks = recs.filter((r) => r.학습태도);
+    const noTimes = !Object.keys(C.parseTimes(st && st.times)).length;
+    $('stu-report').innerHTML = `<div class="card"><h2>학부모 리포트</h2>
+      ${noTimes ? '<div class="notice warn">명단에 등원 시각이 없어 지각을 셀 수 없습니다. [명단]에서 결제일 관리를 다시 불러오거나(수업 시간표의 시각을 가져옴) [수정]에서 적어 주세요.</div>'
+        : `<p class="muted">지각: 정해진 등원 시각(${esc(st.times)})보다 ${C.LATE_GRACE}분 넘게 늦게 온 날만 셉니다.</p>`}
+      ${talks.length ? `<h3>이 기간 지음쌤 톡톡</h3><ul class="talks">${talks.map((r) => `<li>${md(r.수업일)} ${esc(r.학습태도)}</li>`).join('')}</ul>` : ''}
+      <label>지음쌤 한마디<textarea id="report-note" rows="3" placeholder="잘한 점 → 다음 2주 목표">${esc(store.get('note-' + S.stuNo) || '')}</textarea></label>
+      <h3>보낼 문구</h3><textarea id="report-text" class="report-text" rows="${reportText(st, recs).split('\n').length + 2}" readonly>${esc(reportText(st, recs))}</textarea>
+      <div class="row"><button class="btn primary" id="report-copy">문구 복사</button></div></div>`;
+    $('report-note').addEventListener('input', (e) => {
+      store.set('note-' + S.stuNo, e.target.value);
+      $('report-text').value = reportText(st, recs);
+      $('report-text').rows = $('report-text').value.split('\n').length + 2;
+    });
+    $('report-copy').addEventListener('click', async () => {
+      const t = $('report-text');
+      try {
+        await navigator.clipboard.writeText(t.value);
+      } catch (e) {
+        t.select();
+        document.execCommand('copy');
+      }
+      toast('복사했습니다. 카톡에 붙여 넣으세요.');
+    });
   }
   $('stu-select').addEventListener('change', (e) => {
     S.stuNo = e.target.value;

@@ -219,7 +219,7 @@ function loadGas(opts = {}) {
         const code = opts.firestoreStatus || 200;
         const body = code === 200
           ? JSON.stringify([
-            { document: { name: 'projects/jieummath/databases/(default)/documents/users/u1/apps/timetable', fields: { json: { stringValue: '{}' } }, updateTime: '2026-10-09T00:00:00Z' } },
+            { document: { name: 'projects/jieummath/databases/(default)/documents/users/u1/apps/timetable', fields: { json: { stringValue: JSON.stringify(opts.timetable || {}) } }, updateTime: '2026-10-09T00:00:00Z' } },
             { document: { name: 'projects/jieummath/databases/(default)/documents/users/u1/apps/payment', fields: { json: { stringValue: JSON.stringify(opts.payment || { students: [] }) } }, updateTime: '2026-10-10T00:00:00Z' } },
           ])
           : JSON.stringify({ error: { message: 'Permission denied' } });

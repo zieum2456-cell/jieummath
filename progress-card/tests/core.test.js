@@ -153,7 +153,7 @@ test('명단 붙여넣기 해석과 비교', () => {
     { no: '08', name: '한별', grade: '초6', days: '화', status: '재원' },
   ];
   const d = C.diffRoster(current, list);
-  assert.deepEqual(d.add, [{ no: '07', name: '박하늘', grade: '초3', days: '' }, { no: '09', name: '정우', grade: '중1', days: '월금' }]);
+  assert.deepEqual(d.add, [{ no: '07', name: '박하늘', grade: '초3', days: '', times: '' }, { no: '09', name: '정우', grade: '중1', days: '월금', times: '' }]);
   // 요일 없는 줄은 지금 요일 유지, 요일만 바뀌어도 변경으로 잡는다
   assert.deepEqual(d.update.map((u) => [u.no, u.to.grade, u.to.days]), [['56', '초4', '월수'], ['08', '초6', '화목']]);
   assert.deepEqual(d.missing, [{ no: '43', name: '이지아' }]);
@@ -227,4 +227,50 @@ test('학생 기간 집계', () => {
 
 test('CSV 내보내기 형식', () => {
   assert.equal(C.toCsv([['a', 'b,c'], ['줄\n바꿈', '"인용"']]), '﻿a,"b,c"\r\n"줄\n바꿈","""인용"""\r\n');
+});
+
+/* ---------- 학부모 2주 리포트 ---------- */
+
+// 샘플 학생 김하린 (화·목 16:00). 10/22·10/29 지각, 10/27은 5분 늦어 지각 아님
+const HARIN = [
+  { 수업일: '2026-10-20', 출결: '정규', 등원: '16:00', 하원: '17:30', 지난과제: '완료', 단계: '유형', 학습주안점: '문제 읽기(조건 찾기)', 추가포인트: '3', 오늘진도범위: '디딤돌(3)[64~69]○; 디딤돌(3)[70~71]△' },
+  { 수업일: '2026-10-22', 출결: '정규', 등원: '16:12', 하원: '17:40', 지난과제: '50% 이상', 단계: '유형; 단원마무리', 학습주안점: '계산 실수 교정; 풀이 과정 서술', 추가포인트: '0', 오늘진도범위: '디딤돌(3)[74~79]○' },
+  { 수업일: '2026-10-27', 출결: '정규', 등원: '16:05', 하원: '17:30', 지난과제: '완료', 단계: '교재오답; 평가', 학습주안점: '풀이 과정 서술', 추가포인트: '6', 오늘진도범위: '교재오답(3)[~Step3]○; 단원Test(3)[]○' },
+  { 수업일: '2026-10-29', 출결: '정규', 등원: '16:20', 하원: '17:45', 지난과제: '50% 미만', 단계: '개념', 학습주안점: '개념 재학습/오개념 수정; 계산 실수 교정', 추가포인트: '3', 오늘진도범위: '디딤돌(4)[84~89]△' },
+];
+
+test('등원 시각: 적는 방식이 달라도 같은 값으로', () => {
+  assert.deepEqual(C.parseTimes('목 4:30, 화16:00'), { 목: '04:30', 화: '16:00' });
+  assert.equal(C.timesText(C.parseTimes('목16:30 화 16:00')), '화 16:00, 목 16:30');
+  assert.deepEqual(C.parseTimes(''), {});
+});
+
+test('지각: 정해진 시각 + 5분을 넘긴 날만, 결강·시각 없는 요일은 빼고', () => {
+  const late = C.lateList(HARIN, '화 16:00, 목 16:00');
+  assert.deepEqual(late.map((x) => [x.date, x.in, x.out, x.late]), [['2026-10-22', '16:12', '17:40', 12], ['2026-10-29', '16:20', '17:45', 20]]);
+  assert.equal(C.lateList(HARIN, '화 16:00').length, 0); // 목요일 시각이 없으면 목요일은 세지 않음
+  assert.equal(C.lateList([{ 수업일: '2026-10-22', 출결: '결강', 등원: '', 하원: '' }], '목 16:00').length, 0);
+  assert.equal(C.lateList([{ 수업일: '2026-10-22', 출결: '정규', 등원: '16:06', 하원: '17:30' }], '목 16:00').length, 1);
+});
+
+test('부르는 이름: 받침이 있으면 이', () => {
+  assert.equal(C.callName('김하린'), '하린이');
+  assert.equal(C.callName('박서아'), '서아');
+  assert.equal(C.callName('남궁민수'), '남궁민수');
+});
+
+test('학부모 리포트: 출석은 지각 횟수와 지각한 날 등·하원 시각만', () => {
+  const text = C.parentReport({ name: '김하린', times: '화 16:00, 목 16:00' }, HARIN, { from: '2026-10-16', to: '2026-10-29', note: '3단원을 잘 마쳤어요.' });
+  const lines = text.split('\n');
+  assert.equal(lines[0], '[지음수학] 하린이 2주 학습 리포트 (10/16~10/29)');
+  assert.deepEqual(lines.slice(2, 5), ['⏰ 지각 2회', ' · 10/22(목) 등원 16:12 · 하원 17:40', ' · 10/29(목) 등원 16:20 · 하원 17:45']);
+  assert.ok(!/출석|평균/.test(text));
+  assert.ok(lines.includes(' · 10/27 오답 다시 풀기, 단원 평가 (오답 학습지 3단원)'));
+  assert.ok(lines.includes('✏️ 과제 완료율 75% (완료 2회, 50% 이상 1회, 50% 미만 1회)'));
+  assert.ok(lines.includes('⭐ 추가 포인트 12점'));
+  assert.ok(lines.includes('🎯 집중해서 연습한 것: 계산 실수 줄이기, 풀이 과정 쓰기'));
+  assert.ok(lines.includes('3단원을 잘 마쳤어요.'));
+  // 지각이 없으면 '지각 없음', 등원 시각을 모르면 지각 줄을 아예 빼기
+  assert.ok(C.parentReport({ name: '김하린', times: '화 16:30, 목 16:30' }, HARIN).includes('⏰ 지각 없음'));
+  assert.ok(!C.parentReport({ name: '김하린', times: '' }, HARIN).includes('지각'));
 });
