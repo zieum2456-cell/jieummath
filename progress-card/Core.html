@@ -548,6 +548,70 @@
       + (l.books.length ? ` · ${l.books.join(', ')}` : ''));
   }
 
+  /** 받침이 있으면 a, 없으면 b ('과'/'와', '을'/'를') */
+  const josa = (word, a, b) => {
+    const w = String(word).replace(/\)$/, ''); // '3단원(합동과 대칭)' → 괄호 안 마지막 글자로
+    const c = w.charCodeAt(w.length - 1);
+    return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? a : b;
+  };
+  const GOAL_TEXT = {
+    '계산 실수 교정': '계산 실수 줄이기', '풀이 과정 서술': '풀이 과정 꼼꼼히 쓰기',
+    '개념 재학습/오개념 수정': '헷갈린 개념 확실히 다지기', '문제 읽기(조건 찾기)': '문제 조건 꼼꼼히 찾기',
+  };
+
+  /**
+   * 지음쌤 한마디 추천 문구: 기간 기록 전체(단계·단원·평가 점수·과제·포인트·주안점·지각)로 2~4문장
+   * 잘한 점 → 다음 2주 목표 → (과제가 부족하면) 가정에 부탁 순서. 원장님이 화면에서 고쳐 쓴다
+   */
+  function suggestNote(stu, records, opts) {
+    stu = stu || {};
+    opts = opts || {};
+    const rs = [...records].filter((r) => r.출결 !== '결강').sort((a, b) => a.수업일.localeCompare(b.수업일));
+    if (!rs.length) return '';
+    const st = summarize(records, { leftMode: opts.leftMode });
+    // 기록마다 오늘 진도의 단원 번호 (교재·Test 구분 없이 처음 나온 것)
+    const unitOf = (r) => (parseRangeList(r.오늘진도범위).find((x) => x.ok && x.unit) || {}).unit || '';
+    const label = (r, u) => {
+      const name = unitName(stu.grade, r.수업일, u, stu.semester);
+      return `${u}단원${name ? `(${name})` : ''}`;
+    };
+    const has = (r, t) => splitList(r.단계).indexOf(t) >= 0;
+    const out = [];
+    // 1) 진도: 단원 마무리·평가, 새 단원 시작
+    const done = rs.filter((r) => (has(r, '평가') || has(r, '단원마무리')) && unitOf(r));
+    const test = rs.filter((r) => has(r, '평가') && unitOf(r)).pop();
+    const score = test && (/(\d{2,3})\s*점/.exec(test.학습태도 || '') || [])[1];
+    if (test) {
+      out.push(`${label(test, unitOf(test))}${josa(label(test, unitOf(test)), '을', '를')} 마무리하고 단원 평가${score ? `에서 ${score}점을 받았어요` : '까지 마쳤어요'}.`);
+    } else if (done.length) {
+      const last = done[done.length - 1];
+      out.push(`${label(last, unitOf(last))}${josa(label(last, unitOf(last)), '을', '를')} 마무리했어요.`);
+    }
+    const doneUnit = done.length ? unitOf(done[done.length - 1]) : '';
+    const start = rs.filter((r) => has(r, '개념') && unitOf(r) && unitOf(r) !== doneUnit).pop();
+    if (start) out.push(`${out.length ? '이어서 ' : ''}${label(start, unitOf(start))} 개념 학습을 시작했어요.`);
+    if (!out.length) {
+      const fast = rs.filter((r) => r.진행률 === '75~100%').length;
+      out.push(fast * 2 >= rs.length ? '계획한 진도를 꾸준히 잘 나가고 있어요.' : '서두르지 않고 한 단원씩 확실하게 다지고 있어요.');
+    }
+    // 2) 잘한 점: 과제, 추가 포인트
+    const rate = st.homework.rate;
+    if (rate != null && rate >= 0.9) out.push('과제도 빠짐없이 해 와서 칭찬해 주고 싶어요.');
+    if (st.points >= 9) out.push(`추가 문제에도 적극적으로 도전해 포인트 ${st.points}점을 모았어요.`);
+    // 3) 다음 2주 목표: 많이 나온 학습 주안점, 과제, 지각
+    // 가장 많이 나온 주안점 → 과제 → 지각(2회 이상) → 두 번째 주안점 순으로 3개까지
+    const focus = st.errors.map(([t]) => GOAL_TEXT[t] || t);
+    const late = Object.keys(parseTimes(stu.times)).length ? lateList(rs, stu.times).length : 0;
+    const goals = [focus[0], rate != null && rate < 0.8 ? '과제 끝까지 해 오기' : '', late >= 2 ? '제시간에 등원하기' : '', focus[1]].filter(Boolean);
+    if (goals.length) {
+      const g = goals.slice(0, 3);
+      const list = g.length > 1 ? `${g.slice(0, -1).join(', ')}${josa(g[g.length - 2], '과', '와')} ${g[g.length - 1]}` : g[0];
+      out.push(`다음 2주는 ${list}${josa(g[g.length - 1], '을', '를')} 목표로 할게요.`);
+    }
+    if (rate != null && rate < 0.8) out.push('집에서도 과제 마무리를 한 번씩 챙겨봐 주세요.');
+    return out.join(' ');
+  }
+
   /**
    * 학부모 2주 리포트 카톡 문구
    * stu: { name, times, grade, semester }, records: 그 학생의 기간 안 기록, opts: { from, to, leftMode, note }
@@ -594,7 +658,7 @@
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
     validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, nextClassDate, toSheets,
     LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
-    UNITS, SEMESTERS, semesterOf, unitName, LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, parentReport,
+    UNITS, SEMESTERS, semesterOf, unitName, suggestNote, LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, parentReport,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.Core = api;
