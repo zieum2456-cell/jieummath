@@ -463,7 +463,7 @@
 
   /**
    * 지각한 수업: 등원이 그 요일의 정해진 시각 + 5분을 넘긴 기록 (결강, 시각이 없는 요일은 세지 않음)
-   * → [{ date, in, out, due, late(분) }] 날짜순
+   * → [{ date, in, out, minutes(수업시간), due, late(분) }] 날짜순
    */
   function lateList(records, times) {
     const due = parseTimes(times);
@@ -472,7 +472,8 @@
       const at = timeToMin(r.등원);
       if (r.출결 === '결강' || !d || at == null) return null;
       const late = at - timeToMin(d);
-      return late > LATE_GRACE ? { date: r.수업일, in: r.등원, out: r.하원, due: d, late } : null;
+      const minutes = Number(r['수업시간(분)']) || (timeToMin(r.하원) != null ? timeToMin(r.하원) - at : 0);
+      return late > LATE_GRACE ? { date: r.수업일, in: r.등원, out: r.하원, minutes: minutes > 0 ? minutes : 0, due: d, late } : null;
     }).filter(Boolean);
   }
 
@@ -516,7 +517,7 @@
   /**
    * 학부모 2주 리포트 카톡 문구
    * stu: { name, times }, records: 그 학생의 기간 안 기록, opts: { from, to, leftMode, note }
-   * 출석은 지각(정해진 등원 시각 + 5분 초과)한 횟수와 그날 등·하원 시각만 적는다
+   * 출석 줄: 출석 n/n회 · 지각 n회 (정해진 등원 시각 + 5분 초과), 지각한 날의 등·하원 시각과 수업시간
    */
   function parentReport(stu, records, opts) {
     opts = opts || {};
@@ -527,11 +528,13 @@
     const from = opts.from || st.from;
     const to = opts.to || st.to;
     const out = [`[지음수학] ${callName(stu.name)} 2주 학습 리포트${from && to ? ` (${md(from)}~${md(to)})` : ''}`, ''];
-    if (Object.keys(parseTimes(stu.times)).length) {
-      const late = lateList(rs, stu.times);
-      out.push(late.length ? `⏰ 지각 ${late.length}회` : '⏰ 지각 없음');
-      late.forEach((x) => out.push(` · ${mdw(x.date)} 등원 ${x.in} · 하원 ${x.out || '-'}`));
-    }
+    // 출석 n/n회 (결강 빼고 온 횟수 / 전체), 등원 시각을 알면 뒤에 지각 횟수와 지각한 날 등·하원 시각·수업시간
+    const a = st.attendance;
+    let head = rs.length ? `📅 출석 ${a.정규 + a.보강}/${rs.length}회` : '';
+    const late = Object.keys(parseTimes(stu.times)).length ? lateList(rs, stu.times) : null;
+    if (head && late) head += late.length ? ` · 지각 ${late.length}회` : ' · 지각 없음';
+    if (head) out.push(head);
+    (late || []).forEach((x) => out.push(` · ${mdw(x.date)} 등원 ${x.in} · 하원 ${x.out || '-'}${x.minutes ? ` (${x.minutes}분)` : ''}`));
     const flow = flowLines(rs);
     if (flow.length) out.push('📈 이번 2주 흐름', ...flow.map((l) => ` · ${l}`));
     const h = st.homework;
