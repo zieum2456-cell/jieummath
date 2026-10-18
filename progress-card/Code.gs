@@ -593,17 +593,24 @@ function api_changeNo(c) {
 }
 
 /**
- * 명단에서 학생 한 명 지우기 (그 학생의 수업기록은 그대로 둔다)
- * c: { no, dryRun } → { name, count: 남는 수업기록 수, roster }
+ * 명단에서 학생 한 명 지우기
+ * c: { no, dryRun, withRecords } → { name, count: 그 학생의 수업기록 수, deleted: 지운 수업기록 수, roster }
+ *  - withRecords 가 참이면 그 학생의 수업기록도 함께 지우고, 아니면 수업기록은 그대로 둔다
  */
 function api_deleteStudent(c) {
   return withLock_(() => {
     const no = String(c.no || '');
     const r = readObjects_('roster').find((x) => x.학생번호 === no);
     if (!r) throw new Error(`명단에 ${no}번 학생이 없습니다.`);
-    const count = readObjects_('records').filter((x) => x.학생번호 === no).length;
-    const out = { name: r.이름, count };
+    const mine = readObjects_('records').filter((x) => x.학생번호 === no);
+    const out = { name: r.이름, count: mine.length, deleted: 0 };
     if (c.dryRun) return out;
+    if (c.withRecords) {
+      // 아래 행부터 지워야 위쪽 행 번호가 밀리지 않는다
+      const sh = sheet_('records');
+      mine.map((x) => x._row).sort((a, b) => b - a).forEach((row) => sh.deleteRow(row));
+      out.deleted = mine.length;
+    }
     sheet_('roster').deleteRow(r._row);
     out.roster = rosterList_();
     return out;

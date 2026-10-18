@@ -183,6 +183,13 @@ test('명단: 학생 삭제는 명단 줄만 지우고 수업기록은 남긴다
   assert.deepEqual(r.roster.map((s) => [s.no, s.name]), [['56', '김도윤'], ['73', '박채아']]);
   assert.equal(g.ss.getSheetByName('수업기록').objects().filter((x) => x.학생번호 === '43').length, 1);
   assert.throws(() => g.ctx.api_deleteStudent({ no: '43' }), /명단에 43번 학생이 없습니다/);
+  // 수업기록까지 함께 지우기: 그 학생 기록만 빠지고 다른 학생 기록은 그대로
+  const before = g.ss.getSheetByName('수업기록').objects().length;
+  const r2 = plain(g.ctx.api_deleteStudent({ no: '56', withRecords: true }));
+  assert.equal(r2.deleted, 1);
+  const rec = g.ss.getSheetByName('수업기록').objects();
+  assert.equal(rec.length, before - 1);
+  assert.deepEqual(rec.map((x) => x.학생번호), ['43', '73']);
 });
 
 test('명단: Firebase 읽기 실패 시 이유를 알려 준다', () => {
