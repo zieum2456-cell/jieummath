@@ -3,7 +3,6 @@
   'use strict';
   const SW = window.SchoolWeekly;
   const $ = (id) => document.getElementById(id);
-  const CAPTIONS = ['주간학습계획', '학급별 시간표'];
   const SW_DAYS = ['월', '화', '수', '목', '금'];
   let weeks = [];
 
@@ -30,7 +29,8 @@
   // 오른쪽: 반 × 월~금 표에 수학이 있는 칸 표시 (못 읽었으면 원본 시간표)
   function mathView(b, p, x) {
     if (!(x && x.math && Object.keys(x.math).length)) {
-      return p.images[1] ? figure('학급별 시간표', p.images[1], `${b.grade}학년 학급별 시간표`) : '';
+      const src = p.images[SW.timetableIndex(x)];
+      return src ? figure('학급별 시간표', src, `${b.grade}학년 학급별 시간표`) : '';
     }
     const guessed = new Set((x.guessed || []).map(String));
     const classes = Object.keys(x.math).sort((a, c) => a - c);
@@ -55,8 +55,10 @@
         return `<section class="grade"><div class="grade-head"><h2>${b.grade}학년</h2></div>` +
           `<div class="empty">이 주의 게시물이 아직 없습니다. <a href="${esc(SW.listUrl(b, 1))}" target="_blank" rel="noopener">게시판 보기</a></div></section>`;
       }
-      const x = p.extract && p.extract.from && p.extract.from.join('\n') === p.images.slice(0, 2).join('\n') ? p.extract : null;
-      const links = p.images.map((src, k) => `<a href="${esc(src)}" target="_blank" rel="noopener">${CAPTIONS[k] || '이미지 ' + (k + 1)}</a>`).join(' · ');
+      const x = SW.currentExtract(p);
+      const tt = SW.timetableIndex(x);
+      const caption = (k) => (k === 0 ? '주간학습계획' : k === tt ? '학급별 시간표' : '이미지 ' + (k + 1));
+      const links = p.images.map((src, k) => `<a href="${esc(src)}" target="_blank" rel="noopener">${caption(k)}</a>`).join(' · ');
       return `<section class="grade"><div class="grade-head"><h2>${b.grade}학년</h2>` +
         `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)} ↗</a>` +
         (p.images.length ? `<span class="orig">원본 보기: ${links}</span>` : '') + '</div>' +

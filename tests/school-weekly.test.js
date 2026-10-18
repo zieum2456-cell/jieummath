@@ -47,32 +47,36 @@ const VIEW = (imgs) => `
 </tbody></table>
 <img src="/upload/footer/banner.png">`;
 
-test('본문 이미지 3장이면 앞의 2장(주간학습계획, 학급별 시간표)만', () => {
+test('본문 이미지는 모두 순서대로 모은다', () => {
   const html = VIEW(
     '<p><img src="https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/a.jpg" style="width: 754px;">' +
     '<img src="https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/b.jpg" style="font-size: 10pt;">' +
     '<img src="https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/c.jpg"></p>');
   const all = SW.parseImages(html);
   assert.equal(all.length, 3);
-  assert.deepEqual(SW.pickImages(all), [
+  assert.deepEqual(all, [
     'https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/a.jpg',
     'https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/b.jpg',
+    'https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/c.jpg',
   ]);
 });
 
-test('본문 이미지 2장이면 2장 모두, 상대 주소는 사이트 주소로 바꾼다', () => {
+test('상대 주소는 사이트 주소로 바꾼다', () => {
   const html = VIEW('<p><img src="/upload/keditor/haden/306008/x.png"></p><p><img src="/upload/keditor/haden/306008/y.png"></p>');
-  assert.deepEqual(SW.pickImages(SW.parseImages(html)), [
+  assert.deepEqual(SW.parseImages(html), [
     'https://haedeun.icees.kr/upload/keditor/haden/306008/x.png',
     'https://haedeun.icees.kr/upload/keditor/haden/306008/y.png',
   ]);
 });
 
-test('5학년은 첫 번째와 세 번째 이미지(반별 시간표)를 쓰고, 2장뿐이면 앞의 2장', () => {
-  const g5 = SW.BOARDS.find((b) => b.grade === 5);
-  assert.deepEqual(SW.pickImages(['a', 'b', 'c'], g5), ['a', 'c']);
-  assert.deepEqual(SW.pickImages(['a', 'b'], g5), ['a', 'b']);
-  assert.deepEqual(SW.pickImages(['a', 'b', 'c'], SW.BOARDS.find((b) => b.grade === 3)), ['a', 'b']);
+test('뽑은 결과는 지금 이미지로 뽑은 것만 쓰고, 학급별 시간표 번호는 뽑기 결과를 따른다', () => {
+  const x = { from: ['a', 'b', 'c'], timetable: 2, math: {} };
+  assert.equal(SW.currentExtract({ images: ['a', 'b', 'c'], extract: x }), x);
+  assert.equal(SW.currentExtract({ images: ['a', 'c'], extract: x }), null); // 예전 방식(2장만 저장)으로 뽑은 결과
+  assert.equal(SW.currentExtract({ images: ['a'] }), null);
+  assert.equal(SW.timetableIndex(x), 2);
+  assert.equal(SW.timetableIndex({ from: ['a', 'b'], timetable: null }), 1);
+  assert.equal(SW.timetableIndex(null), 1);
 });
 
 test('같은 주차끼리 묶고 최신 주가 먼저, 같은 주 같은 학년은 나중 글', () => {

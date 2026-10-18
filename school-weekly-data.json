@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-16T15:06:20.891Z",
+ "updatedAt": "2026-10-18T15:43:02.531Z",
  "weeks": [
   {
    "monday": "2026-10-19",
@@ -10,14 +10,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306002&viewBoardID=306002&boardSeq=34252288&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020503&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141321395_87841.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141327826_95178.jpg"
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141327826_95178.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141333450_77997.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141321395_87841.jpg",
-       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141327826_95178.jpg"
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141327826_95178.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261016_141333450_77997.jpg"
       ],
       "plan": "school-weekly/2026-10-19/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -89,6 +92,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261016_084156118_60308.jpg"
       ],
       "plan": "school-weekly/2026-10-19/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -167,9 +171,7 @@
         "금"
        ]
       },
-      "guessed": [
-       1
-      ]
+      "guessed": []
      }
     },
     "5": {
@@ -178,14 +180,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34250210&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261016_091201853_86466.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261016_091201911_20789.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261016_091201963_18357.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261016_091201853_86466.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261016_091201911_20789.jpg",
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261016_091201963_18357.jpg"
       ],
       "plan": "school-weekly/2026-10-19/5.jpg",
+      "timetable": 2,
       "math": {
        "1": [
         "화",
@@ -260,6 +265,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261016_123426744_51795.png"
       ],
       "plan": "school-weekly/2026-10-19/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -346,6 +352,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261008_145643314_89334.jpg"
       ],
       "plan": "school-weekly/2026-10-12/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -427,6 +434,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261008_105824696_39157.jpg"
       ],
       "plan": "school-weekly/2026-10-12/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "수",
@@ -484,9 +492,7 @@
         "수"
        ]
       },
-      "guessed": [
-       1
-      ]
+      "guessed": []
      }
     },
     "5": {
@@ -495,14 +501,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34224472&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261008_133226574_26699.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261008_133226623_17503.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261008_133226669_08981.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261008_133226574_26699.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261008_133226623_17503.jpg",
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261008_133226669_08981.jpg"
       ],
       "plan": "school-weekly/2026-10-12/5.jpg",
+      "timetable": 2,
       "math": {
        "1": [
         "월",
@@ -577,15 +586,17 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261008_144709911_27803.png"
       ],
       "plan": "school-weekly/2026-10-12/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
-        "월",
+        "화",
+        "수",
         "목"
        ],
        "2": [
-        "월",
         "화",
-        "수"
+        "수",
+        "목"
        ],
        "3": [
         "월",
@@ -594,44 +605,41 @@
        ],
        "4": [
         "월",
+        "화",
         "목"
        ],
        "5": [
-        "월",
-        "목"
-       ],
-       "6": [
-        "월"
-       ],
-       "7": [
-        "월"
-       ],
-       "8": [
-        "월",
         "화",
         "수",
         "목"
        ],
-       "9": [
-        "월",
+       "6": [
+        "화",
         "수",
         "목"
        ],
+       "7": [
+        "월",
+        "화",
+        "수"
+       ],
+       "8": [
+        "월",
+        "화",
+        "수"
+       ],
+       "9": [
+        "월",
+        "화",
+        "수"
+       ],
        "10": [
         "월",
-        "수"
+        "화",
+        "목"
        ]
       },
       "guessed": [
-       1,
-       2,
-       3,
-       4,
-       5,
-       6,
-       7,
-       8,
-       9,
        10
       ]
      }
@@ -655,6 +663,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261002_083132619_72154.jpg"
       ],
       "plan": "school-weekly/2026-10-05/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",
@@ -716,6 +725,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261001_155511272_50987.jpg"
       ],
       "plan": "school-weekly/2026-10-05/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "수"
@@ -751,9 +761,7 @@
         "화"
        ]
       },
-      "guessed": [
-       1
-      ]
+      "guessed": []
      }
     },
     "5": {
@@ -762,22 +770,75 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34206138&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261002_111048040_86113.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261002_111048091_36892.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261002_111048140_05871.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261002_111048040_86113.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261002_111048091_36892.jpg",
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261002_111048140_05871.jpg"
       ],
       "plan": "school-weekly/2026-10-05/5.jpg",
+      "timetable": 1,
       "math": {
-       "1": [],
-       "2": []
+       "1": [
+        "화",
+        "수",
+        "목"
+       ],
+       "2": [
+        "화",
+        "수",
+        "목"
+       ],
+       "3": [
+        "화",
+        "수",
+        "목"
+       ],
+       "4": [
+        "화",
+        "수",
+        "목"
+       ],
+       "5": [
+        "화",
+        "수",
+        "목"
+       ],
+       "6": [
+        "화",
+        "수",
+        "목"
+       ],
+       "7": [
+        "화",
+        "수",
+        "목"
+       ],
+       "8": [
+        "화",
+        "수",
+        "목"
+       ],
+       "9": [
+        "화",
+        "수",
+        "목"
+       ],
+       "10": [
+        "화",
+        "수",
+        "목"
+       ],
+       "11": [
+        "화",
+        "수",
+        "목"
+       ]
       },
-      "guessed": [
-       1,
-       2
-      ]
+      "guessed": []
      }
     },
     "6": {
@@ -794,6 +855,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261002_144459662_44370.png"
       ],
       "plan": "school-weekly/2026-10-05/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "수",
@@ -850,14 +912,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306002&viewBoardID=306002&boardSeq=34171430&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020503&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084046974_71425.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084054322_95019.jpg"
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084054322_95019.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084104833_15442.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084046974_71425.jpg",
-       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084054322_95019.jpg"
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084054322_95019.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260923_084104833_15442.jpg"
       ],
       "plan": "school-weekly/2026-09-28/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",
@@ -919,6 +984,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/09/20260922_145518809_81254.jpg"
       ],
       "plan": "school-weekly/2026-09-28/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "수",
@@ -977,22 +1043,64 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34172082&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260923_094737634_96498.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260923_094737702_72777.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260923_094737789_25166.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260923_094737634_96498.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260923_094737702_72777.jpg",
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260923_094737789_25166.jpg"
       ],
       "plan": "school-weekly/2026-09-28/5.jpg",
+      "timetable": 1,
       "math": {
-       "1": [],
-       "2": []
+       "1": [
+        "화",
+        "목"
+       ],
+       "2": [
+        "화",
+        "목"
+       ],
+       "3": [
+        "화",
+        "금"
+       ],
+       "4": [
+        "목",
+        "금"
+       ],
+       "5": [
+        "목",
+        "금"
+       ],
+       "6": [
+        "화",
+        "금"
+       ],
+       "7": [
+        "목",
+        "금"
+       ],
+       "8": [
+        "화",
+        "목"
+       ],
+       "9": [
+        "목",
+        "금"
+       ],
+       "10": [
+        "목",
+        "금"
+       ],
+       "11": [
+        "화",
+        "금"
+       ]
       },
-      "guessed": [
-       1,
-       2
-      ]
+      "guessed": []
      }
     },
     "6": {
@@ -1009,6 +1117,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/09/20260923_103417225_52579.png"
       ],
       "plan": "school-weekly/2026-09-28/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화"
@@ -1036,6 +1145,9 @@
        ],
        "9": [
         "수"
+       ],
+       "10": [
+        "수"
        ]
       },
       "guessed": []
@@ -1060,6 +1172,7 @@
        "https://haedeun.icees.kr/upload/2026/09/20260918_084003313_18924.jpg"
       ],
       "plan": "school-weekly/2026-09-21/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -1129,6 +1242,7 @@
        "https://haedeun.icees.kr/upload/2026/09/20260918_082156715_25672.jpg"
       ],
       "plan": "school-weekly/2026-09-21/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -1175,9 +1289,7 @@
         "화"
        ]
       },
-      "guessed": [
-       1
-      ]
+      "guessed": []
      }
     },
     "5": {
@@ -1186,20 +1298,75 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34153748&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260917_154155359_86651.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260917_154155438_03929.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260917_154155492_59368.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260917_154155359_86651.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260917_154155438_03929.jpg",
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260917_154155492_59368.jpg"
       ],
       "plan": "school-weekly/2026-09-21/5.jpg",
+      "timetable": 1,
       "math": {
-       "1": []
+       "1": [
+        "월",
+        "화",
+        "수"
+       ],
+       "2": [
+        "월",
+        "화",
+        "수"
+       ],
+       "3": [
+        "월",
+        "화",
+        "수"
+       ],
+       "4": [
+        "월",
+        "화",
+        "수"
+       ],
+       "5": [
+        "월",
+        "화",
+        "수"
+       ],
+       "6": [
+        "월",
+        "화",
+        "수"
+       ],
+       "7": [
+        "월",
+        "화",
+        "수"
+       ],
+       "8": [
+        "월",
+        "화",
+        "수"
+       ],
+       "9": [
+        "월",
+        "화",
+        "수"
+       ],
+       "10": [
+        "월",
+        "화",
+        "수"
+       ],
+       "11": [
+        "월",
+        "화",
+        "수"
+       ]
       },
-      "guessed": [
-       1
-      ]
+      "guessed": []
      }
     },
     "6": {
@@ -1216,21 +1383,26 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/09/20260918_083640573_79597.png"
       ],
       "plan": "school-weekly/2026-09-21/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",
         "수"
        ],
        "2": [
-        "화"
+        "화",
+        "수"
        ],
        "3": [
+        "월",
         "수"
        ],
        "4": [
+        "화",
         "수"
        ],
        "5": [
+        "화",
         "수"
        ],
        "6": [
@@ -1248,9 +1420,15 @@
        "9": [
         "화",
         "수"
+       ],
+       "10": [
+        "화",
+        "수"
        ]
       },
-      "guessed": []
+      "guessed": [
+       10
+      ]
      }
     }
    }
@@ -1264,14 +1442,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306002&viewBoardID=306002&boardSeq=34131358&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020503&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/2026/09/20260911_134714828_10360.jpg",
-      "https://haedeun.icees.kr/upload/2026/09/20260911_134720539_44871.jpg"
+      "https://haedeun.icees.kr/upload/2026/09/20260911_134720539_44871.jpg",
+      "https://haedeun.icees.kr/upload/2026/09/20260911_134726219_17827.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/2026/09/20260911_134714828_10360.jpg",
-       "https://haedeun.icees.kr/upload/2026/09/20260911_134720539_44871.jpg"
+       "https://haedeun.icees.kr/upload/2026/09/20260911_134720539_44871.jpg",
+       "https://haedeun.icees.kr/upload/2026/09/20260911_134726219_17827.jpg"
       ],
       "plan": "school-weekly/2026-09-14/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -1353,6 +1534,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/09/20260911_085003002_85980.jpg"
       ],
       "plan": "school-weekly/2026-09-14/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",
@@ -1421,9 +1603,7 @@
         "금"
        ]
       },
-      "guessed": [
-       1
-      ]
+      "guessed": []
      }
     },
     "5": {
@@ -1432,15 +1612,87 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34134150&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134318982_42207.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319048_42268.jpg"
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319048_42268.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319101_50923.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319151_70945.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134318982_42207.jpg",
-       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319048_42268.jpg"
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319048_42268.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319101_50923.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260911_134319151_70945.jpg"
       ],
       "plan": "school-weekly/2026-09-14/5.jpg",
-      "math": null,
+      "timetable": 2,
+      "math": {
+       "1": [
+        "월",
+        "화",
+        "수",
+        "목"
+       ],
+       "2": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "3": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "4": [
+        "월",
+        "화",
+        "수",
+        "금"
+       ],
+       "5": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "6": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "7": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "8": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "9": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "10": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "11": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ]
+      },
       "guessed": []
      }
     },
@@ -1458,6 +1710,7 @@
        "https://haedeun.icees.kr/upload/2026/09/20260912_125920202_04362.jpg"
       ],
       "plan": null,
+      "timetable": 1,
       "math": {
        "1": [
         "화",
@@ -1524,14 +1777,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306002&viewBoardID=306002&boardSeq=34106036&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020503&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083451338_42850.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083457397_79068.jpg"
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083457397_79068.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083503134_32939.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083451338_42850.jpg",
-       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083457397_79068.jpg"
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083457397_79068.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/09/20260904_083503134_32939.jpg"
       ],
       "plan": "school-weekly/2026-09-07/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -1613,6 +1869,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/09/20260903_154735520_87674.jpg"
       ],
       "plan": "school-weekly/2026-09-07/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -1693,15 +1950,87 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34107094&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338677_86565.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338745_45447.jpg"
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338745_45447.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338799_72717.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338863_79637.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338677_86565.jpg",
-       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338745_45447.jpg"
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338745_45447.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338799_72717.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/09/20260904_102338863_79637.jpg"
       ],
       "plan": "school-weekly/2026-09-07/5.jpg",
-      "math": null,
+      "timetable": 2,
+      "math": {
+       "1": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "2": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "3": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "4": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "5": [
+        "월",
+        "화",
+        "수",
+        "금"
+       ],
+       "6": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "7": [
+        "월",
+        "화",
+        "수",
+        "금"
+       ],
+       "8": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "9": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "10": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "11": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ]
+      },
       "guessed": []
      }
     },
@@ -1719,6 +2048,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/09/20260904_144802361_05399.png"
       ],
       "plan": "school-weekly/2026-09-07/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -1764,6 +2094,11 @@
         "월",
         "화",
         "금"
+       ],
+       "10": [
+        "월",
+        "화",
+        "금"
        ]
       },
       "guessed": []
@@ -1780,14 +2115,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306002&viewBoardID=306002&boardSeq=34081630&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020503&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121354314_12083.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121400649_70202.jpg"
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121400649_70202.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121406449_04096.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121354314_12083.jpg",
-       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121400649_70202.jpg"
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121400649_70202.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/08/20260828_121406449_04096.jpg"
       ],
       "plan": "school-weekly/2026-08-31/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",
@@ -1868,6 +2206,7 @@
        "https://haedeun.icees.kr/upload/2026/09/20260901_110419283_92757.jpg"
       ],
       "plan": "school-weekly/2026-08-31/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",
@@ -1936,9 +2275,7 @@
         "목"
        ]
       },
-      "guessed": [
-       1
-      ]
+      "guessed": []
      }
     },
     "5": {
@@ -1947,14 +2284,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34071670&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/2026/08/20260827_083403756_38203.jpg",
-      "https://haedeun.icees.kr/upload/2026/08/20260827_083403818_69714.jpg"
+      "https://haedeun.icees.kr/upload/2026/08/20260827_083403818_69714.jpg",
+      "https://haedeun.icees.kr/upload/2026/08/20260827_083403868_70765.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/2026/08/20260827_083403756_38203.jpg",
-       "https://haedeun.icees.kr/upload/2026/08/20260827_083403818_69714.jpg"
+       "https://haedeun.icees.kr/upload/2026/08/20260827_083403818_69714.jpg",
+       "https://haedeun.icees.kr/upload/2026/08/20260827_083403868_70765.jpg"
       ],
       "plan": "school-weekly/2026-08-31/5.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -2040,6 +2380,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/08/20260828_144718809_47292.png"
       ],
       "plan": "school-weekly/2026-08-31/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",
@@ -2124,6 +2465,7 @@
        "https://haedeun.icees.kr/upload/2026/08/20260824_133636191_88067.jpg"
       ],
       "plan": "school-weekly/2026-08-24/3.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -2201,6 +2543,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/08/20260821_084705100_10508.jpg"
       ],
       "plan": "school-weekly/2026-08-24/4.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -2237,6 +2580,20 @@
         "목",
         "금"
        ],
+       "6": [
+        "월",
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "7": [
+        "월",
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
        "8": [
         "월",
         "화",
@@ -2249,10 +2606,23 @@
         "수",
         "목",
         "금"
+       ],
+       "10": [
+        "월",
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "11": [
+        "월",
+        "화",
+        "수",
+        "목",
+        "금"
        ]
       },
       "guessed": [
-       1,
        4
       ]
      }
@@ -2263,14 +2633,17 @@
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34055524&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151037958_81088.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151038017_00195.jpg"
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151038017_00195.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151038065_12779.jpg"
      ],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151037958_81088.jpg",
-       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151038017_00195.jpg"
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151038017_00195.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260820_151038065_12779.jpg"
       ],
       "plan": "school-weekly/2026-08-24/5.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "월",
@@ -2377,8 +2750,48 @@
        "https://haedeun.icees.kr/upload/2026/08/20260812_163316595_26826.png"
       ],
       "plan": "school-weekly/2026-08-17/3.jpg",
+      "timetable": 1,
       "math": {
+       "1": [
+        "수",
+        "목",
+        "금"
+       ],
+       "2": [
+        "수",
+        "목",
+        "금"
+       ],
+       "3": [
+        "수",
+        "목",
+        "금"
+       ],
+       "4": [
+        "수",
+        "목",
+        "금"
+       ],
+       "5": [
+        "수",
+        "목",
+        "금"
+       ],
+       "6": [
+        "수",
+        "목",
+        "금"
+       ],
+       "7": [
+        "수",
+        "목"
+       ],
        "8": [
+        "수",
+        "목",
+        "금"
+       ],
+       "9": [
         "수",
         "목",
         "금"
@@ -2412,6 +2825,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/08/20260812_110542621_23446.jpg"
       ],
       "plan": "school-weekly/2026-08-17/5.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "목",
@@ -2475,6 +2889,7 @@
        "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/08/20260813_115843373_19671.png"
       ],
       "plan": "school-weekly/2026-08-17/6.jpg",
+      "timetable": 1,
       "math": {
        "1": [
         "화",

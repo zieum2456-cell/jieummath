@@ -8,11 +8,9 @@
  *   6학년: "6학년 2학기 10주 (10.19~10.23) 주간학습안내", "6학년 2학기 2주 8.24~8.28 주간학습안내"
  * 제목에 처음 나오는 날짜(시작일)로 그 주의 월요일을 구해 같은 주차끼리 묶는다.
  *
- * 게시물 본문 이미지는 2장 또는 3장이다.
- *   3장: 주간학습계획, 학급별 시간표, 교과별 시간표
- *   2장: 주간학습계획, 학급별+교과별 시간표
- * 어느 경우든 앞의 2장(주간학습계획, 학급별 시간표)만 쓴다.
- * 단 5학년은 3장(주간학습계획, 전담 시간표, 반별 시간표)이라 1번째와 3번째를 쓴다(BOARDS의 timetableIndex).
+ * 게시물 본문 이미지는 2~4장이다. 첫 장은 주간학습계획이고, 학급별 시간표가 몇 번째인지는 게시물마다 다르다
+ * (5학년은 전담 시간표가 학급별 시간표 앞에 오기도 뒤에 오기도 한다). 그래서 이미지를 모두 저장해 두고,
+ * 수학 부분 뽑기(scripts/school-weekly-extract.py)가 학급별 시간표를 찾아 extract.timetable에 번호를 적는다.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -24,10 +22,9 @@
   const BOARDS = [
     { grade: 3, boardID: '306002', m: '020503' },
     { grade: 4, boardID: '306004', m: '020504' },
-    { grade: 5, boardID: '306006', m: '020505', timetableIndex: 2 }, // 5학년은 세 번째 이미지가 반별 시간표
+    { grade: 5, boardID: '306006', m: '020505' },
     { grade: 6, boardID: '306008', m: '020506' },
   ];
-  const KEEP_IMAGES = 2;
 
   function listUrl(board, page) {
     return `${SITE}/boardCnts/list.do?boardID=${board.boardID}&m=${board.m}&s=haden${page > 1 ? '&page=' + page : ''}`;
@@ -116,11 +113,15 @@
     return urls;
   }
 
-  // [주간학습계획, 학급별 시간표]. 시간표 위치가 다른 게시판은 board.timetableIndex로 정한다(없으면 앞에서 가까운 것).
-  function pickImages(urls, board) {
-    const t = board && board.timetableIndex;
-    if (t && urls.length > t) return [urls[0], urls[t]];
-    return urls.slice(0, KEEP_IMAGES);
+  // 수학 부분 뽑은 결과: 지금 게시물 이미지로 뽑은 것일 때만 쓴다 (이미지가 바뀌면 다음 실행 때 다시 뽑는다)
+  function currentExtract(p) {
+    const x = p && p.extract;
+    return x && x.from && x.from.join('\n') === (p.images || []).join('\n') ? x : null;
+  }
+
+  // 학급별 시간표 이미지 번호 (뽑기 단계가 찾은 번호, 없으면 두 번째 이미지)
+  function timetableIndex(x) {
+    return x && Number.isInteger(x.timetable) ? x.timetable : 1;
   }
 
   // 학년별 게시물 → 주차별로 묶기. posts: [{ grade, seq, title, week, images }]
@@ -165,7 +166,7 @@
   }
 
   return {
-    SITE, BOARDS, KEEP_IMAGES, listUrl, viewUrl, parseList, titleStart, mondayOf, weekOfTitle,
-    parseImages, pickImages, groupWeeks, addDays, defaultWeek, weekLabel,
+    SITE, BOARDS, listUrl, viewUrl, parseList, titleStart, mondayOf, weekOfTitle,
+    parseImages, currentExtract, timetableIndex, groupWeeks, addDays, defaultWeek, weekLabel,
   };
 });
