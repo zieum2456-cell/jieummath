@@ -6,7 +6,7 @@
 (function (root) {
   'use strict';
 
-  const HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '교정주안점', '추가포인트',
+  const HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '학습주안점', '추가포인트',
     '지난과제범위', '오늘진도범위', '추가포인트범위', '오늘과제', '학습태도', '확인필요'];
 
   const ENUMS = {
@@ -14,11 +14,11 @@
     지난과제: ['완료', '미완', '안 함', '두고 옴', '과제 없음'],
     단계: ['개념', '유형', '단원마무리', '교재오답', 'Test', '경시'],
     진행률: ['50% 미만', '50~75%', '75~100%'],
-    교정주안점: ['개념 재학습/오개념 수정', '문제 읽기(조건 찾기)', '계산 실수 교정', '풀이 과정 서술'],
+    학습주안점: ['개념 재학습/오개념 수정', '문제 읽기(조건 찾기)', '계산 실수 교정', '풀이 과정 서술'],
     추가포인트: ['0', '3', '6', '9'],
   };
-  const MULTI = ['단계', '교정주안점'];
-  // 2026-10-18 카드 양식 변경 전 이름: 열 '오답원인' → '교정주안점', 보기는 뜻이 같은 것끼리 바꾼다
+  const MULTI = ['단계', '학습주안점'];
+  // 2026-10-18 카드 양식 변경 전 이름: 열 '오답원인' → '학습주안점', 보기는 뜻이 같은 것끼리 바꾼다
   const OLD_FOCUS_COL = '오답원인';
   const OLD_FOCUS = { '개념 이해 부족': '개념 재학습/오개념 수정', '조건 놓침': '문제 읽기(조건 찾기)', '계산 실수': '계산 실수 교정', '풀이 과정 생략': '풀이 과정 서술' };
   const focusList = (s) => splitList(s).map((t) => OLD_FOCUS[t] || t).join('; ');
@@ -93,7 +93,7 @@
     }
     // 옛 양식 CSV(오답원인 열)도 받는다
     const oldFocus = recs[0].cells.some((s) => s.trim() === OLD_FOCUS_COL);
-    const head = recs[0].cells.map((s) => s.trim()).map((h) => (h === OLD_FOCUS_COL ? '교정주안점' : h));
+    const head = recs[0].cells.map((s) => s.trim()).map((h) => (h === OLD_FOCUS_COL ? '학습주안점' : h));
     for (let i = 0; i < Math.max(head.length, HEADERS.length); i++) {
       if (head[i] === HEADERS[i]) continue;
       const got = head[i] == null ? '(없음)' : `"${head[i]}"`;
@@ -107,7 +107,7 @@
     res.cards = recs.slice(1).map((r) => {
       const values = {};
       HEADERS.forEach((h, i) => (values[h] = (r.cells[i] == null ? '' : r.cells[i]).trim()));
-      if (oldFocus) values.교정주안점 = focusList(values.교정주안점);
+      if (oldFocus) values.학습주안점 = focusList(values.학습주안점);
       return { rowNo: r.rowNo, cellCount: r.cells.length, values };
     });
     if (!res.cards.length) res.headerErrors.push('카드(제목 줄 아래 행)가 없습니다.');
@@ -242,7 +242,7 @@
     const out = {};
     HEADERS.forEach((h) => {
       const s = String(values[h] == null ? '' : values[h]).trim();
-      out[h] = h === '교정주안점' ? focusList(s) : MULTI.includes(h) ? splitList(s).join('; ') : s;
+      out[h] = h === '학습주안점' ? focusList(s) : MULTI.includes(h) ? splitList(s).join('; ') : s;
     });
     return out;
   }
@@ -417,9 +417,9 @@
     });
     const mins = rs.filter((r) => r.출결 !== '결강').map((r) => Number(r['수업시간(분)'])).filter((n) => n > 0);
     const errorMap = {};
-    rs.forEach((r) => splitList(focusList(r.교정주안점)).forEach((t) => (errorMap[t] = (errorMap[t] || 0) + 1)));
+    rs.forEach((r) => splitList(focusList(r.학습주안점)).forEach((t) => (errorMap[t] = (errorMap[t] || 0) + 1)));
     const errors = Object.keys(errorMap).map((k) => [k, errorMap[k]])
-      .sort((a, b) => b[1] - a[1] || ENUMS.교정주안점.indexOf(a[0]) - ENUMS.교정주안점.indexOf(b[0]));
+      .sort((a, b) => b[1] - a[1] || ENUMS.학습주안점.indexOf(a[0]) - ENUMS.학습주안점.indexOf(b[0]));
     return {
       count: rs.length,
       from: rs.length ? rs[0].수업일 : '',

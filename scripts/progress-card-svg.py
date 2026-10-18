@@ -5,8 +5,8 @@ progress-card/CardSvg.html 을 만든다. (인쇄 탭이 이 양식 위에 학�
 카드 아래쪽 가운데(아래 기준점 사각형과 같은 높이)에 icons/jieum-logo-card.png 로고를 넣는다.
 
 PDF 양식에서 바꾸는 것 (2026-10-18 요청)
-- '오답 원인' 칸 → '교정 주안점' (보기: 개념 재학습/오개념 수정, 문제 읽기(조건 찾기), 계산 실수 교정, 풀이 과정 서술)
-- 학습 목표 아래 순서: 추가 포인트 → 오늘 과제 → 교정 주안점 → 학습태도
+- '오답 원인' 칸 → '학습 주안점' (보기: 개념 재학습/오개념 수정, 문제 읽기(조건 찾기), 계산 실수 교정, 풀이 과정 서술)
+- 학습 목표 아래 순서: 추가 포인트 → 오늘 과제 → 학습 주안점 → 학습태도
 새 글자는 Noto Sans KR(PDF 양식과 같은 글꼴 계열)에서 글자 모양을 뽑아 넣는다. 글꼴은 처음 실행할 때 내려받는다.
 
   pip install fonttools
@@ -151,14 +151,14 @@ def text_path(text, x, baseline, weight, size, space):
     return '<path fill="#111" d="%s"/>' % pen.getCommands()
 
 
-# 교정 주안점 칸: 원래 '오답 원인' 칸의 글자 자리 그대로 (보기 동그라미는 원래 것을 쓴다)
+# 학습 주안점 칸: 원래 '오답 원인' 칸의 글자 자리 그대로 (보기 동그라미는 원래 것을 쓴다)
 a = band['mistake'][0]
 LABEL = (17.54, a + 15.67)  # 칸 이름 기준선
 ROWS = [a + 14.25, a + 29.25]  # 보기 글자 기준선 (두 줄)
 COLS = [68.12, 171.8]  # 보기 글자 시작 x (두 칸)
 CHOICES = ['개념 재학습/오개념 수정', '문제 읽기(조건 찾기)', '계산 실수 교정', '풀이 과정 서술']
 # 크기는 PDF 양식 글자와 맞춤 (칸 이름 굵게 7.0pt 간격, 보기 6.88pt 간격; Noto Sans KR 한글 폭 0.92em)
-mistake_text = text_path('교정 주안점', LABEL[0], LABEL[1], 'B', 6.996 / 0.92, 1.98) + ''.join(
+mistake_text = text_path('학습 주안점', LABEL[0], LABEL[1], 'B', 6.996 / 0.92, 1.98) + ''.join(
     text_path(t, COLS[k % 2], ROWS[k // 2], 'R', 6.882 / 0.92, 2.12) for k, t in enumerate(CHOICES))
 
 parts = {name: [] for name in OLD}
