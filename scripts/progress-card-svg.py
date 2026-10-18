@@ -193,12 +193,44 @@ for t, w in zip(HW_CHOICES, widths):
     hw_text += text_path(t, x + HW_GAP, HW_BASE, 'R', hw_size, hw_sp)
     x += w + space
 
+# 출결 칸: [결강][보강] 등원 ___ 하원 ___ → 등원 __:__ 하원 __:__ … [결강][보강]
+att = next((a, b) for a, b in zip(dividers, dividers[1:]) if 93 < a < 94)
+ATT_X0, ATT_X1 = 59.21, 266.17  # 칸 안쪽 왼쪽(첫 동그라미 자리), 오른쪽 끝
+OMR_END = 108.007 + 6.88  # 원래 '보강' 글자 끝
+dx_omr = ATT_X1 - OMR_END
+LABEL_GAP = 17.34  # '등원' 글자 시작 → 밑줄 시작 (원래 양식과 같음)
+ATT_GAP = 10  # 등원 밑줄 끝 → '하원' 글자
+line_len = (ATT_X0 + dx_omr - 12 - ATT_X0 - 2 * LABEL_GAP - ATT_GAP) / 2
+in_x = ATT_X0
+out_x = in_x + LABEL_GAP + line_len + ATT_GAP
+att_shift = lambda x: dx_omr if x < 120 else (in_x - 129.14 if x < 180 else out_x - 187.74)
+ULINE_Y, ULINE_H = 111.38, 0.71
+colon_w = text_width(':', 'R', 6.882 / 0.92, 0)
+att_text = ''
+for x in (in_x, out_x):
+    a = x + LABEL_GAP
+    att_text += '<path fill="#8c8c8c" d="M%.2f %.2fh%.2fv%.2fh-%.2fZ"/>' % (a, ULINE_Y, line_len, ULINE_H, line_len)
+    att_text += text_path(':', a + (line_len - colon_w) / 2, 109.96, 'R', 6.882 / 0.92, 0)
+
 parts = {name: [] for name in OLD}
 body = ''
 for c in card:
     name = band_of(c)
     t = top_y(c)
-    if name is None and t is not None and hw[0] + 0.1 < t <= hw[1] + 0.1:
+    if name is None and t is not None and att[0] + 0.1 < t <= att[1] + 0.1:
+        if c.tag == SVG + 'path' and not c.get('transform') and c.get('fill', '').startswith('rgb(54.'):
+            continue  # 옛 밑줄
+        if c.tag == SVG + 'path' and c.get('transform'):
+            x = 0.712404 * float(re.findall(r'-?[\d.]+', c.get('d'))[0]) + 0.442753
+        elif c.tag == SVG + 'g':
+            x = float(c.find(SVG + 'use').get('x'))
+        else:
+            x = None
+        if x is None or x < 55:
+            body += emit(c)  # 칸 이름(출결)
+        else:
+            body += '<g transform="translate(%.2f,0)">%s</g>' % (att_shift(x), emit(c))
+    elif name is None and t is not None and hw[0] + 0.1 < t <= hw[1] + 0.1:
         if c.tag == SVG + 'path' and c.get('transform'):
             hw_bubble = hw_bubble or emit(c)  # 보기 동그라미
             continue
@@ -212,7 +244,7 @@ for c in card:
     else:
         parts[name].append(emit(c))
 parts['mistake'].append(mistake_text)
-body += hw_text + ''.join('<g transform="translate(%.2f,0)">%s</g>' % (x - HW_X0, hw_bubble) for x in hw_x)
+body += att_text + hw_text + ''.join('<g transform="translate(%.2f,0)">%s</g>' % (x - HW_X0, hw_bubble) for x in hw_x)
 for name in NEW:
     body += '<g transform="translate(0,%.2f)">%s</g>' % (shift[name], ''.join(parts[name]))
 
