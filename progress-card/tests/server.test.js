@@ -157,7 +157,7 @@ test('명단: 등원 요일도 불러오고, 학생 수정 때는 그대로 둔�
   assert.deepEqual(roster.map((s) => [s.no, s.grade, s.days]), [['56', '초5', '월수금'], ['43', '초5', '화목']]);
 });
 
-test('명단: 등원요일 열이 없던 시트에는 열을 붙인다', () => {
+test('명단: 등원요일·등원시각 열이 없던 시트에는 열을 붙인다', () => {
   const g = loadGas();
   const old = g.ss.insertSheet('학생명단');
   old.appendRow(['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시']);
@@ -165,10 +165,11 @@ test('명단: 등원요일 열이 없던 시트에는 열을 붙인다', () => {
   g.ctx.setup();
   const sh = g.ss.getSheetByName('학생명단');
   assert.equal(sh.getRange(1, 9).getDisplayValues()[0][0], '등원요일');
+  assert.equal(sh.getRange(1, 10).getDisplayValues()[0][0], '등원시각');
   const roster = plain(g.ctx.api_applyRoster({ add: [], update: [{ no: '56', name: '김도윤', grade: '초4', days: '월' }], retire: [] }));
   assert.deepEqual(roster.map((s) => [s.level, s.group, s.memo, s.days]), [['기본', 'A', '메모', '월']]);
   g.ctx.setup(); // 두 번 실행해도 열이 더 생기지 않음
-  assert.equal(sh.getLastColumn(), 9);
+  assert.equal(sh.getLastColumn(), 11);
 });
 
 test('명단: 학생 삭제는 명단 줄만 지우고 수업기록은 남긴다', () => {
@@ -272,4 +273,36 @@ test('2단계: 기록 읽기, 명단 추가·수정, 내보내기', () => {
   const x = plain(g.ctx.api_export('xlsx'));
   assert.match(x.name, /\.xlsx$/);
   assert.equal(folder.files.length, 2);
+});
+
+test('명단: 등원 시각은 수업 시간표에서 이름으로 찾아 불러오고, [수정]에서도 고친다', () => {
+  const g = fresh({
+    payment: { students: [{ no: '07', name: '김하린', grade: '초5', days: [2, 4] }, { no: '43', name: '이지아', grade: '초5' }] },
+    timetable: { students: [{ id: 'a', name: '김하린', times: { 4: { in: '16:00', out: '17:30' }, 2: { in: '16:00', out: '17:30' } } }] },
+  });
+  const r = plain(g.ctx.api_fetchPaymentRoster());
+  assert.deepEqual(r.students.map((s) => [s.no, s.times]), [['07', '화 16:00, 목 16:00'], ['43', null]]);
+  let roster = plain(g.ctx.api_applyRoster({ add: r.students, update: [], retire: [] }));
+  assert.deepEqual(roster.map((s) => s.times), ['화 16:00, 목 16:00', '']);
+  // 시간표에 없는 학생은 [수정]에서 적는다. 다음 불러오기 때 times 가 null 이면 그대로 둔다
+  roster = plain(g.ctx.api_saveStudent({ no: '43', name: '이지아', grade: '초5', times: '수17:00' }));
+  assert.equal(roster[1].times, '수 17:00');
+  roster = plain(g.ctx.api_applyRoster({ add: [], update: [{ no: '43', name: '이지아', grade: '초5', times: null }], retire: [] }));
+  assert.equal(roster[1].times, '수 17:00');
+  assert.throws(() => g.ctx.api_saveStudent({ no: '43', name: '이지아', times: '오후 다섯 시' }), /화 16:00/);
+  // 시각을 안 보내는 수정(옛 화면)은 그대로 둔다
+  roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5' }));
+  assert.equal(roster[0].times, '화 16:00, 목 16:00');
+});
+
+test('명단: 수업 학기는 [수정]에서 고정하거나 비우고, 다른 수정 때는 그대로 둔다', () => {
+  const g = fresh();
+  g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5', isNew: true });
+  let roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5', semester: '1학기' }));
+  assert.equal(roster[0].semester, '1학기');
+  roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5' }));
+  assert.equal(roster[0].semester, '1학기');
+  roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5', semester: '' }));
+  assert.equal(roster[0].semester, '');
+  assert.throws(() => g.ctx.api_saveStudent({ no: '07', name: '김하린', semester: '여름학기' }), /1학기 \/ 2학기/);
 });

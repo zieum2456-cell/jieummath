@@ -15,9 +15,11 @@ const CSV_HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', 
 const SHEETS = {
   roster: {
     name: '학생명단',
-    // 등원요일은 나중에 생긴 열이라 맨 뒤에 둔다 (이미 쓰던 시트는 ensureHeaders_ 가 열을 붙인다)
-    headers: ['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시', '등원요일'],
-    widths: [70, 90, 60, 110, 60, 60, 200, 140, 70],
+    // 등원요일·등원시각은 나중에 생긴 열이라 맨 뒤에 둔다 (이미 쓰던 시트는 ensureHeaders_ 가 열을 붙인다)
+    // 등원시각: 요일별 정해진 등원 시각 '화 16:00, 목 16:00' (학부모 리포트의 지각 계산에 씀)
+    // 수업학기: 비우면 수업일 기준(2~7월 1학기, 8~1월 2학기), '1학기'/'2학기'면 그 학기 단원명으로 (선행 등)
+    headers: ['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시', '등원요일', '등원시각', '수업학기'],
+    widths: [70, 90, 60, 110, 60, 60, 200, 140, 70, 140, 70],
   },
   records: {
     name: '수업기록',
@@ -310,7 +312,7 @@ function uniqueName_(folder, name) {
 function rosterList_() {
   return readObjects_('roster')
     .filter((r) => r.학생번호)
-    .map((r) => ({ no: r.학생번호, name: r.이름, grade: r.학년, days: r.등원요일 || '', level: r.디딤돌레벨, group: r.발송조, status: r.상태 || '재원', memo: r.메모 }));
+    .map((r) => ({ no: r.학생번호, name: r.이름, grade: r.학년, days: r.등원요일 || '', times: r.등원시각 || '', semester: r.수업학기 || '', level: r.디딤돌레벨, group: r.발송조, status: r.상태 || '재원', memo: r.메모 }));
 }
 
 function api_init() {
@@ -552,8 +554,9 @@ function api_addStudent(s) {
 
 /**
  * 명단 불러오기 반영 (디딤돌레벨·발송조·메모는 그대로 둔다)
- * c: { add: [{no,name,grade,days}], update: [{no,name,grade,days}], retire: [no] }
+ * c: { add: [{no,name,grade,days,times}], update: [{no,name,grade,days,times}], retire: [no] }
  *  - days(등원 요일, '월수금')가 없으면(예전 형식으로 붙여 넣은 명단) 지금 값을 그대로 둔다
+ *  - times(등원 시각, '화 16:00, 목 16:00')도 없으면(수업 시간표에 없는 학생) 그대로 둔다
  */
 function api_applyRoster(c) {
   return withLock_(() => {
@@ -564,6 +567,7 @@ function api_applyRoster(c) {
       if (!r) return;
       Object.assign(r, { 이름: u.name, 학년: u.grade, 상태: '재원', 수정일시: time });
       if (u.days != null) r.등원요일 = u.days;
+      if (u.times != null) r.등원시각 = u.times;
       writeObject_('roster', r._row, r);
     });
     (c.retire || []).forEach((no) => {
@@ -573,7 +577,7 @@ function api_applyRoster(c) {
       writeObject_('roster', r._row, r);
     });
     const adds = (c.add || []).filter((a) => !rows.some((x) => x.학생번호 === a.no));
-    appendObjects_('roster', adds.map((a) => ({ 학생번호: a.no, 이름: a.name, 학년: a.grade || '', 등원요일: a.days || '', 상태: '재원', 수정일시: time })));
+    appendObjects_('roster', adds.map((a) => ({ 학생번호: a.no, 이름: a.name, 학년: a.grade || '', 등원요일: a.days || '', 등원시각: a.times || '', 상태: '재원', 수정일시: time })));
     return rosterList_();
   });
 }
@@ -666,8 +670,10 @@ function api_deleteStudent(c) {
 
 /**
  * 결제일 관리 앱(Firebase)에서 학생 명단 읽기
- * Firestore 문서 users/{로그인한 사람}/apps/payment 의 json 필드 → { students: [{no,name,grade,days}], noNumber: [이름] }
+ * Firestore 문서 users/{로그인한 사람}/apps/payment 의 json 필드 → { students: [{no,name,grade,days,times}], noNumber: [이름] }
  *  days: 등원 요일 [1, 3, 5](0=일) → '월수금' (월요일부터)
+ *  times: 같은 계정의 수업 시간표(apps/timetable)에서 이름이 같은 학생의 요일별 등원 시각 → '화 16:00, 목 16:00'
+ *         (시간표에 없으면 null: 명단의 지금 값을 그대로 둔다)
  */
 function api_fetchPaymentRoster() {
   const projectId = settings_().파이어베이스프로젝트ID || 'jieummath';
@@ -697,7 +703,11 @@ function api_fetchPaymentRoster() {
   if (!docs.length) throw new Error('Firebase에서 결제일 관리 데이터를 찾지 못했습니다. 결제일 관리 앱에서 구글 로그인(온라인 저장)을 했는지 확인해 주세요.');
   const json = docs[0].fields && docs[0].fields.json && docs[0].fields.json.stringValue;
   const data = JSON.parse(json || '{}');
-  const students = (data.students || []).map((s) => ({ no: String(s.no || ''), name: String(s.name || '').trim(), grade: s.grade || '', days: daysText_(s.days) }));
+  const table = timetableTimes_(docs[0].name.replace(/\/payment$/, '/timetable'), JSON.parse(res.getContentText()));
+  const students = (data.students || []).map((s) => {
+    const name = String(s.name || '').trim();
+    return { no: String(s.no || ''), name, grade: s.grade || '', days: daysText_(s.days), times: name in table ? table[name] : null };
+  });
   return {
     students: students.filter((s) => /^\d{2}$/.test(s.no)),
     noNumber: students.filter((s) => !/^\d{2}$/.test(s.no)).map((s) => s.name),
@@ -707,6 +717,37 @@ function api_fetchPaymentRoster() {
 }
 
 const WEEKDAYS_ = ['일', '월', '화', '수', '목', '금', '토'];
+
+/** 수업 시간표 문서(결제일 관리와 같은 계정) → { 이름: '화 16:00, 목 16:00' } */
+function timetableTimes_(docName, results) {
+  const doc = results.map((x) => x.document).find((d) => d && d.name === docName);
+  const json = doc && doc.fields && doc.fields.json && doc.fields.json.stringValue;
+  let data = {};
+  try {
+    data = JSON.parse(json || '{}');
+  } catch (e) { /* 시간표를 못 읽어도 명단은 불러온다 */ }
+  const out = {};
+  (Array.isArray(data.students) ? data.students : []).forEach((s) => {
+    const name = String(s.name || '').trim();
+    const t = s.times || {};
+    const text = [1, 2, 3, 4, 5, 6, 0].filter((d) => t[d] && t[d].in).map((d) => `${WEEKDAYS_[d]} ${t[d].in}`).join(', ');
+    if (name && text && !(name in out)) out[name] = timesText_(text);
+  });
+  return out;
+}
+
+const SEMESTERS_ = ['1학기', '2학기'];
+const TIME_ITEM_RE_ = /[월화수목금토일]\s*\d{1,2}:\d{2}/;
+/** '화16:00 목 4:30' → '화 16:00, 목 04:30' (Core.parseTimes 와 같은 규칙) */
+function timesText_(s) {
+  const out = {};
+  const re = /([월화수목금토일])\s*(\d{1,2}):(\d{2})/g;
+  let m;
+  while ((m = re.exec(String(s || '').normalize('NFC')))) {
+    if (+m[2] <= 23 && +m[3] <= 59) out[m[1]] = ('0' + m[2]).slice(-2) + ':' + m[3];
+  }
+  return '월화수목금토일'.split('').filter((d) => out[d]).map((d) => d + ' ' + out[d]).join(', ');
+}
 function daysText_(days) {
   const list = (Array.isArray(days) ? days : []).map(Number).filter((d) => d >= 0 && d <= 6);
   return list.filter((d, i) => list.indexOf(d) === i).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAYS_[d]).join('');
@@ -739,7 +780,8 @@ const STATUSES = ['재원', '퇴원'];
 
 /**
  * 명단 한 명 추가·수정 (학생번호는 api_changeNo 로만 바꾼다)
- * s: { no, name, grade, level, group, status, memo, isNew }
+ * s: { no, name, grade, level, group, status, memo, times, semester, isNew }
+ *  - times(등원 시각)는 수업 시간표에 없는 학생을 위해 여기서도 고칠 수 있다 (없으면 그대로 둠)
  */
 function api_saveStudent(s) {
   return withLock_(() => {
@@ -754,7 +796,14 @@ function api_saveStudent(s) {
     const rows = readObjects_('roster');
     const r = rows.find((x) => x.학생번호 === no);
     // 등원요일은 결제일 관리에서 불러올 때만 바뀐다
-    const obj = { 학생번호: no, 이름: name, 학년: s.grade || '', 디딤돌레벨: s.level || '', 발송조: s.group || '', 상태: status, 메모: s.memo || '', 수정일시: now_(), 등원요일: r ? r.등원요일 : '' };
+    let times = r ? r.등원시각 || '' : '';
+    if (s.times != null) {
+      if (String(s.times).trim() && !TIME_ITEM_RE_.test(s.times)) throw new Error('등원 시각은 "화 16:00, 목 16:00"처럼 적어 주세요.');
+      times = timesText_(s.times);
+    }
+    const semester = s.semester != null ? String(s.semester) : r ? r.수업학기 || '' : '';
+    if (semester && SEMESTERS_.indexOf(semester) < 0) throw new Error('수업 학기는 비우거나 1학기 / 2학기 중 하나여야 합니다.');
+    const obj = { 학생번호: no, 이름: name, 학년: s.grade || '', 디딤돌레벨: s.level || '', 발송조: s.group || '', 상태: status, 메모: s.memo || '', 수정일시: now_(), 등원요일: r ? r.등원요일 : '', 등원시각: times, 수업학기: semester };
     if (s.isNew) {
       if (r) throw new Error(`${no}번은 이미 ${r.이름} 학생이 쓰고 있습니다.`);
       appendObjects_('roster', [obj]);

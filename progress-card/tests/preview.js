@@ -19,9 +19,12 @@ const g = loadGas({
       { no: '09', name: '정우진', grade: '중1', days: [2, 4, 6] },
       { no: '18', name: '한별', grade: '초6', days: [2] },
       { no: '27', name: '최서연', grade: '초3', days: [2, 3] },
+      { no: '07', name: '김하린', grade: '초5', days: [2, 4] },
       { no: '', name: '번호없는학생', grade: '초3' },
     ],
   },
+  // 수업 시간표: 등원 시각을 명단에 불러온다 (학부모 리포트 지각 계산)
+  timetable: { students: [{ id: 't1', name: '김하린', times: { 2: { in: '16:00', out: '17:30' }, 4: { in: '16:00', out: '17:30' } } }] },
 });
 g.ctx.setup();
 
