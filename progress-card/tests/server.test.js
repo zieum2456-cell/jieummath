@@ -169,7 +169,7 @@ test('명단: 등원요일·등원시각 열이 없던 시트에는 열을 붙�
   const roster = plain(g.ctx.api_applyRoster({ add: [], update: [{ no: '56', name: '김도윤', grade: '초4', days: '월' }], retire: [] }));
   assert.deepEqual(roster.map((s) => [s.level, s.group, s.memo, s.days]), [['기본', 'A', '메모', '월']]);
   g.ctx.setup(); // 두 번 실행해도 열이 더 생기지 않음
-  assert.equal(sh.getLastColumn(), 10);
+  assert.equal(sh.getLastColumn(), 11);
 });
 
 test('명단: 학생 삭제는 명단 줄만 지우고 수업기록은 남긴다', () => {
@@ -293,4 +293,16 @@ test('명단: 등원 시각은 수업 시간표에서 이름으로 찾아 불러
   // 시각을 안 보내는 수정(옛 화면)은 그대로 둔다
   roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5' }));
   assert.equal(roster[0].times, '화 16:00, 목 16:00');
+});
+
+test('명단: 수업 학기는 [수정]에서 고정하거나 비우고, 다른 수정 때는 그대로 둔다', () => {
+  const g = fresh();
+  g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5', isNew: true });
+  let roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5', semester: '1학기' }));
+  assert.equal(roster[0].semester, '1학기');
+  roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5' }));
+  assert.equal(roster[0].semester, '1학기');
+  roster = plain(g.ctx.api_saveStudent({ no: '07', name: '김하린', grade: '초5', semester: '' }));
+  assert.equal(roster[0].semester, '');
+  assert.throws(() => g.ctx.api_saveStudent({ no: '07', name: '김하린', semester: '여름학기' }), /1학기 \/ 2학기/);
 });

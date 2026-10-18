@@ -260,12 +260,16 @@ test('부르는 이름: 받침이 있으면 이', () => {
 });
 
 test('학부모 리포트: 출석 n/n회 뒤에 지각 횟수, 지각한 날 등·하원 시각과 수업시간', () => {
-  const text = C.parentReport({ name: '김하린', times: '화 16:00, 목 16:00' }, HARIN, { from: '2026-10-16', to: '2026-10-29', note: '3단원을 잘 마쳤어요.' });
+  const text = C.parentReport({ name: '김하린', times: '화 16:00, 목 16:00', grade: '초5' }, HARIN, { from: '2026-10-16', to: '2026-10-29', note: '3단원을 잘 마쳤어요.' });
   const lines = text.split('\n');
   assert.equal(lines[0], '[지음수학] 하린이 2주 학습 리포트 (10/16~10/29)');
   // 10/22는 기록의 수업시간(분), 10/29는 기록에 없어 등·하원으로 계산
   assert.deepEqual(lines.slice(2, 5), ['📅 출석 4/4회 · 지각 2회', ' · 10/22(목) 등원 16:12 · 하원 17:40 (88분)', ' · 10/29(목) 등원 16:20 · 하원 17:45 (85분)']);
-  assert.ok(lines.includes(' · 10/27 오답 다시 풀기, 단원 평가 (오답 학습지 3단원)'));
+  assert.ok(lines.includes(' · 10/20 유형 연습 · 디딤돌 3단원(합동과 대칭)'));
+  assert.ok(lines.includes(' · 10/27 오답 다시 풀기, 단원 평가 · 오답 학습지 3단원(합동과 대칭)'));
+  assert.ok(lines.includes(' · 10/29 개념 학습 · 디딤돌 4단원(소수의 곱셈)'));
+  // 학년을 모르면 단원 번호만
+  assert.ok(C.parentReport({ name: '김하린' }, HARIN).includes(' · 10/20 유형 연습 · 디딤돌 3단원\n'));
   assert.ok(lines.includes('✏️ 과제 완료율 75% (완료 2회, 50% 이상 1회, 50% 미만 1회)'));
   assert.ok(lines.includes('⭐ 추가 포인트 12점'));
   assert.ok(lines.includes('🎯 집중해서 연습한 것: 계산 실수 줄이기, 풀이 과정 쓰기'));
@@ -274,4 +278,20 @@ test('학부모 리포트: 출석 n/n회 뒤에 지각 횟수, 지각한 날 등
   assert.ok(C.parentReport({ name: '김하린', times: '화 16:30, 목 16:30' }, HARIN).includes('📅 출석 4/4회 · 지각 없음'));
   const noTimes = C.parentReport({ name: '김하린', times: '' }, [...HARIN, { 수업일: '2026-10-30', 출결: '결강' }]);
   assert.ok(noTimes.includes('📅 출석 4/5회\n') && !noTimes.includes('지각'));
+});
+
+test('단원 이름: 3~6학년, 수업일 기준 학기(2~7월 1학기) 또는 학생별로 고정한 학기', () => {
+  assert.equal(C.unitName('초5', '2026-10-20', '3'), '합동과 대칭');
+  assert.equal(C.unitName('초5', '2026-07-31', '3'), '대응 관계');
+  assert.equal(C.unitName('초5', '2026-08-01', '3'), '합동과 대칭');
+  assert.equal(C.unitName('초5', '2027-01-31', '3'), '합동과 대칭');
+  assert.equal(C.unitName('초5', '2027-02-01', '3'), '대응 관계');
+  assert.equal(C.unitName('초5', '2026-10-20', '3', '1학기'), '대응 관계'); // 선행·복습으로 학기를 고정
+  assert.equal(C.unitName('초6', '2026-10-20', '6'), '원기둥, 원뿔, 구');
+  assert.equal(C.unitName('초3', '2026-03-02', '1'), '덧셈과 뺄셈');
+  assert.equal(C.unitName('초2', '2026-03-02', '1'), ''); // 1~2학년은 데이터 없음
+  assert.equal(C.unitName('중1', '2026-03-02', '1'), '');
+  assert.equal(C.unitName('초5', '2026-10-20', '7'), '');
+  assert.deepEqual(Object.keys(C.UNITS), ['3', '4', '5', '6']);
+  Object.values(C.UNITS).forEach((g) => [1, 2].forEach((t) => assert.equal(g[t].length, 6)));
 });

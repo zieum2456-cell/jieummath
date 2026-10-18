@@ -485,6 +485,38 @@
     return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? first + '이' : first;
   }
 
+  /**
+   * 초등 수학 단원명 (2022 개정, 3~6학년). UNITS[학년][학기] = [1단원, 2단원, …]
+   * 2026-10-18 원장님이 준 '초등 전학년 수학 단원명' 표에서 옮김
+   */
+  const UNITS = {
+    3: {
+      1: ['덧셈과 뺄셈', '평면도형', '나눗셈', '곱셈', '길이와 시간', '분수와 소수'],
+      2: ['곱셈', '나눗셈', '원', '분수', '들이와 무게', '그림그래프'],
+    },
+    4: {
+      1: ['큰 수', '각도', '곱셈과 나눗셈', '평면도형의 이동', '막대그래프', '규칙 찾기'],
+      2: ['분수의 덧셈과 뺄셈', '삼각형', '소수의 덧셈과 뺄셈', '사각형', '꺾은선그래프', '다각형'],
+    },
+    5: {
+      1: ['자연수의 혼합 계산', '약수와 배수', '대응 관계', '약분과 통분', '분수의 덧셈과 뺄셈', '다각형의 둘레와 넓이'],
+      2: ['수의 범위와 어림하기', '분수의 곱셈', '합동과 대칭', '소수의 곱셈', '직육면체와 정육면체', '평균과 가능성'],
+    },
+    6: {
+      1: ['분수의 나눗셈', '각기둥과 각뿔', '소수의 나눗셈', '비와 비율', '여러 가지 그래프', '직육면체의 겉넓이와 부피'],
+      2: ['분수의 나눗셈', '소수의 나눗셈', '공간과 입체', '비례식과 비례배분', '원의 둘레와 넓이', '원기둥, 원뿔, 구'],
+    },
+  };
+  // 학생별 학기: '' = 수업일 기준(2~7월 1학기, 8~1월 2학기), 아니면 그 학기로 고정 (선행 등)
+  const SEMESTERS = ['1학기', '2학기'];
+  const semesterOf = (date, fixed) => (fixed === '1학기' ? 1 : fixed === '2학기' ? 2 : (+date.slice(5, 7) >= 2 && +date.slice(5, 7) <= 7 ? 1 : 2));
+  /** 단원 이름: grade '초5', unit '3' → '합동과 대칭' (모르면 '') */
+  function unitName(grade, date, unit, fixed) {
+    const m = /^초([3-6])$/.exec(nfc(grade).trim());
+    const list = m && validDate(date) ? UNITS[m[1]][semesterOf(date, fixed)] : null;
+    return (list && /^\d+$/.test(String(unit).trim()) && list[+unit - 1]) || '';
+  }
+
   const STAGE_TEXT = { 개념: '개념 학습', 유형: '유형 연습', 단원마무리: '단원 마무리', 교재오답: '오답 다시 풀기', 평가: '단원 평가', 경시: '심화(경시) 문제' };
   const FOCUS_TEXT = {
     '개념 재학습/오개념 수정': '헷갈린 개념 다시 잡기', '문제 읽기(조건 찾기)': '문제 조건 찾기',
@@ -493,8 +525,9 @@
   const BOOK_TEXT = { 교재오답: '오답 학습지', '교재오답-자료집': '자료집 오답 학습지' };
   const HOMEWORK_KEYS = ['완료', '50% 이상', '50% 미만', '미완', '안 함', '두고 옴'];
 
-  /** 단계가 바뀐 구간마다 한 줄: '10/20 유형 연습 (디딤돌 3단원)' */
-  function flowLines(records) {
+  /** 단계가 바뀐 구간마다 한 줄: '10/20 유형 연습 · 디딤돌 3단원(합동과 대칭)'. stu: { grade, semester } 가 있으면 단원 이름도 */
+  function flowLines(records, stu) {
+    stu = stu || {};
     const rs = [...records].filter((r) => r.출결 !== '결강').sort((a, b) => a.수업일.localeCompare(b.수업일));
     const order = (t) => (ENUMS.단계.indexOf(t) < 0 ? 99 : ENUMS.단계.indexOf(t));
     const lines = [];
@@ -506,17 +539,18 @@
       if (!last || last.key !== key) lines.push((last = { key, date: r.수업일, stage, books: [] }));
       parseRangeList(r.오늘진도범위).forEach((x) => {
         if (!x.ok || /Test$/.test(x.book)) return;
-        const b = (BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` : '');
+        const name = x.unit ? unitName(stu.grade, r.수업일, x.unit, stu.semester) : '';
+        const b = (BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` : '') + (name ? `(${name})` : '');
         if (last.books.indexOf(b) < 0) last.books.push(b);
       });
     });
     return lines.map((l) => `${+l.date.slice(5, 7)}/${+l.date.slice(8, 10)} ${l.stage.map((t) => STAGE_TEXT[t] || t).join(', ')}`
-      + (l.books.length ? ` (${l.books.join(', ')})` : ''));
+      + (l.books.length ? ` · ${l.books.join(', ')}` : ''));
   }
 
   /**
    * 학부모 2주 리포트 카톡 문구
-   * stu: { name, times }, records: 그 학생의 기간 안 기록, opts: { from, to, leftMode, note }
+   * stu: { name, times, grade, semester }, records: 그 학생의 기간 안 기록, opts: { from, to, leftMode, note }
    * 출석 줄: 출석 n/n회 · 지각 n회 (정해진 등원 시각 + 5분 초과), 지각한 날의 등·하원 시각과 수업시간
    */
   function parentReport(stu, records, opts) {
@@ -535,7 +569,7 @@
     if (head && late) head += late.length ? ` · 지각 ${late.length}회` : ' · 지각 없음';
     if (head) out.push(head);
     (late || []).forEach((x) => out.push(` · ${mdw(x.date)} 등원 ${x.in} · 하원 ${x.out || '-'}${x.minutes ? ` (${x.minutes}분)` : ''}`));
-    const flow = flowLines(rs);
+    const flow = flowLines(rs, stu);
     if (flow.length) out.push('📈 이번 2주 흐름', ...flow.map((l) => ` · ${l}`));
     const h = st.homework;
     if (h.rate != null) {
@@ -560,7 +594,7 @@
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
     validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, nextClassDate, toSheets,
     LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
-    LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, parentReport,
+    UNITS, SEMESTERS, semesterOf, unitName, LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, parentReport,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.Core = api;

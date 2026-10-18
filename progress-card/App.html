@@ -738,6 +738,7 @@
       <label>디딤돌 레벨<select data-f="level">${opt(C.LEVELS, s.level, '-')}</select></label>
       <label>발송 조<select data-f="group">${opt(C.GROUPS, s.group, '-')}</select></label>
       <label>상태<select data-f="status">${opt(['재원', '퇴원'], s.status || '재원')}</select></label>
+      <label>수업 학기<select data-f="semester"><option value="">수업일 기준</option>${C.SEMESTERS.map((o) => `<option ${o === s.semester ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
       <label class="wide">등원 시각<input data-f="times" value="${esc(s.times || '')}" placeholder="화 16:00, 목 16:00" autocomplete="off"></label>
       <label class="wide">메모<input data-f="memo" value="${esc(s.memo)}" autocomplete="off"></label></div>
       <div class="row"><button class="btn small primary" data-edit-save="${isNew ? 'new' : esc(s.no)}">저장</button>
@@ -750,7 +751,7 @@
     $('roster-count').textContent = `(재원 ${list.filter((s) => s.status !== '퇴원').length}명)`;
     const rows = list.map((s) => {
       if (S.editNo === s.no) return editRow(s, false);
-      return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td><td>${esc(s.days)}${s.times ? `<div class="muted small">${esc(s.times)}</div>` : ''}</td>
+      return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}${s.semester ? `<div class="muted small">${esc(s.semester)} 고정</div>` : ''}</td><td>${esc(s.days)}${s.times ? `<div class="muted small">${esc(s.times)}</div>` : ''}</td>
           <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td><td class="muted">${esc(s.memo)}</td>
           <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button> <button class="btn small danger" data-del="${esc(s.no)}">삭제</button></td></tr>`
           + (S.del && S.del.no === s.no ? `<tr><td colspan="9" style="white-space:normal"><div class="notice warn" style="margin:0">
@@ -814,7 +815,7 @@
     busy('저장 중…');
     try {
       S.roster = await run('api_saveStudent', {
-        isNew, no, name: val('name'), grade: val('grade'), level: val('level'), group: val('group'), status: val('status'), memo: val('memo'), times: val('times'),
+        isNew, no, name: val('name'), grade: val('grade'), level: val('level'), group: val('group'), status: val('status'), memo: val('memo'), times: val('times'), semester: val('semester'),
       });
       S.editNo = null;
       revalidate();
@@ -1125,7 +1126,7 @@
   }
 
   /* 학부모 2주 리포트: 기록으로 문구를 만들고, 지음쌤 한마디만 직접 적는다 */
-  const reportText = (st, recs) => C.parentReport({ name: st ? st.name : '', times: st ? st.times : '' }, recs,
+  const reportText = (st, recs) => C.parentReport({ name: st ? st.name : '', times: st ? st.times : '', grade: st ? st.grade : '', semester: st ? st.semester : '' }, recs,
     { from: S.period.from, to: S.period.to, leftMode: leftMode(), note: store.get('note-' + S.stuNo) || '' });
   function renderReport(st, recs) {
     if (!recs.length) return ($('stu-report').innerHTML = '');
@@ -1134,6 +1135,7 @@
     $('stu-report').innerHTML = `<div class="card"><h2>학부모 리포트</h2>
       ${noTimes ? '<div class="notice warn">명단에 등원 시각이 없어 지각을 셀 수 없습니다. [명단]에서 결제일 관리를 다시 불러오거나(수업 시간표의 시각을 가져옴) [수정]에서 적어 주세요.</div>'
         : `<p class="muted">지각: 정해진 등원 시각(${esc(st.times)})보다 ${C.LATE_GRACE}분 넘게 늦게 온 날만 셉니다.</p>`}
+      <p class="muted">단원 이름: ${/^초[3-6]$/.test(st && st.grade || '') ? `${esc(st.grade)} ${st.semester ? `${esc(st.semester)} (명단에서 고정)` : '수업일 기준 학기 (2~7월 1학기, 8~1월 2학기)'}` : '초3~초6 학생만 단원 번호 옆에 이름을 붙입니다.'}</p>
       ${talks.length ? `<h3>이 기간 지음쌤 톡톡</h3><ul class="talks">${talks.map((r) => `<li>${md(r.수업일)} ${esc(r.학습태도)}</li>`).join('')}</ul>` : ''}
       <label>지음쌤 한마디<textarea id="report-note" rows="3" placeholder="잘한 점 → 다음 2주 목표">${esc(store.get('note-' + S.stuNo) || '')}</textarea></label>
       <h3>보낼 문구</h3><textarea id="report-text" class="report-text" rows="${reportText(st, recs).split('\n').length + 2}" readonly>${esc(reportText(st, recs))}</textarea>

@@ -17,8 +17,9 @@ const SHEETS = {
     name: '학생명단',
     // 등원요일·등원시각은 나중에 생긴 열이라 맨 뒤에 둔다 (이미 쓰던 시트는 ensureHeaders_ 가 열을 붙인다)
     // 등원시각: 요일별 정해진 등원 시각 '화 16:00, 목 16:00' (학부모 리포트의 지각 계산에 씀)
-    headers: ['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시', '등원요일', '등원시각'],
-    widths: [70, 90, 60, 110, 60, 60, 200, 140, 70, 140],
+    // 수업학기: 비우면 수업일 기준(2~7월 1학기, 8~1월 2학기), '1학기'/'2학기'면 그 학기 단원명으로 (선행 등)
+    headers: ['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시', '등원요일', '등원시각', '수업학기'],
+    widths: [70, 90, 60, 110, 60, 60, 200, 140, 70, 140, 70],
   },
   records: {
     name: '수업기록',
@@ -311,7 +312,7 @@ function uniqueName_(folder, name) {
 function rosterList_() {
   return readObjects_('roster')
     .filter((r) => r.학생번호)
-    .map((r) => ({ no: r.학생번호, name: r.이름, grade: r.학년, days: r.등원요일 || '', times: r.등원시각 || '', level: r.디딤돌레벨, group: r.발송조, status: r.상태 || '재원', memo: r.메모 }));
+    .map((r) => ({ no: r.학생번호, name: r.이름, grade: r.학년, days: r.등원요일 || '', times: r.등원시각 || '', semester: r.수업학기 || '', level: r.디딤돌레벨, group: r.발송조, status: r.상태 || '재원', memo: r.메모 }));
 }
 
 function api_init() {
@@ -735,6 +736,7 @@ function timetableTimes_(docName, results) {
   return out;
 }
 
+const SEMESTERS_ = ['1학기', '2학기'];
 const TIME_ITEM_RE_ = /[월화수목금토일]\s*\d{1,2}:\d{2}/;
 /** '화16:00 목 4:30' → '화 16:00, 목 04:30' (Core.parseTimes 와 같은 규칙) */
 function timesText_(s) {
@@ -778,7 +780,7 @@ const STATUSES = ['재원', '퇴원'];
 
 /**
  * 명단 한 명 추가·수정 (학생번호는 api_changeNo 로만 바꾼다)
- * s: { no, name, grade, level, group, status, memo, times, isNew }
+ * s: { no, name, grade, level, group, status, memo, times, semester, isNew }
  *  - times(등원 시각)는 수업 시간표에 없는 학생을 위해 여기서도 고칠 수 있다 (없으면 그대로 둠)
  */
 function api_saveStudent(s) {
@@ -799,7 +801,9 @@ function api_saveStudent(s) {
       if (String(s.times).trim() && !TIME_ITEM_RE_.test(s.times)) throw new Error('등원 시각은 "화 16:00, 목 16:00"처럼 적어 주세요.');
       times = timesText_(s.times);
     }
-    const obj = { 학생번호: no, 이름: name, 학년: s.grade || '', 디딤돌레벨: s.level || '', 발송조: s.group || '', 상태: status, 메모: s.memo || '', 수정일시: now_(), 등원요일: r ? r.등원요일 : '', 등원시각: times };
+    const semester = s.semester != null ? String(s.semester) : r ? r.수업학기 || '' : '';
+    if (semester && SEMESTERS_.indexOf(semester) < 0) throw new Error('수업 학기는 비우거나 1학기 / 2학기 중 하나여야 합니다.');
+    const obj = { 학생번호: no, 이름: name, 학년: s.grade || '', 디딤돌레벨: s.level || '', 발송조: s.group || '', 상태: status, 메모: s.memo || '', 수정일시: now_(), 등원요일: r ? r.등원요일 : '', 등원시각: times, 수업학기: semester };
     if (s.isNew) {
       if (r) throw new Error(`${no}번은 이미 ${r.이름} 학생이 쓰고 있습니다.`);
       appendObjects_('roster', [obj]);
