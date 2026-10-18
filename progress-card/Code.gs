@@ -9,7 +9,7 @@
 const TZ = 'Asia/Seoul';
 
 // Core.html 의 HEADERS 와 같아야 한다 (CSV 열 순서)
-const CSV_HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '오답원인', '추가포인트',
+const CSV_HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '교정주안점', '추가포인트',
   '지난과제범위', '오늘진도범위', '추가포인트범위', '오늘과제', '학습태도', '확인필요'];
 
 const SHEETS = {
@@ -119,10 +119,35 @@ function ensureSheets_(ss) {
   });
 }
 
+// 이름이 바뀐 열: 옛 이름 → { 새 이름, 값 바꾸기 } (2026-10-18 카드 양식 변경: 오답원인 → 교정주안점)
+const RENAMED_COLS = {
+  오답원인: {
+    to: '교정주안점',
+    values: { '개념 이해 부족': '개념 재학습/오개념 수정', '조건 놓침': '문제 읽기(조건 찾기)', '계산 실수': '계산 실수 교정', '풀이 과정 생략': '풀이 과정 서술' },
+  },
+};
+
+/** 옛 이름 열을 새 이름으로 바꾸고, 그 열에 저장된 값도 새 보기 이름으로 바꾼다 (한 번만 일어남) */
+function renameColumns_(sh, def, head) {
+  head.forEach((h, i) => {
+    const r = RENAMED_COLS[h];
+    if (!r || def.headers.indexOf(r.to) !== i || head.indexOf(r.to) >= 0) return;
+    sh.getRange(1, i + 1).setValue(r.to);
+    head[i] = r.to;
+    const rows = sh.getLastRow() - 1;
+    if (rows < 1) return;
+    const range = sh.getRange(2, i + 1, rows, 1);
+    range.setValues(range.getDisplayValues().map(([v]) => [
+      String(v).split(';').map((t) => t.trim()).filter(Boolean).map((t) => r.values[t] || t).join('; '),
+    ]));
+  });
+}
+
 /** 이미 쓰던 탭에 나중에 생긴 열(맨 뒤)이 없으면 붙인다. 기존 열 순서가 다르면 건드리지 않는다 */
 function ensureHeaders_(sh, def) {
   const n = sh.getLastColumn();
   const head = n ? sh.getRange(1, 1, 1, n).getDisplayValues()[0] : [];
+  renameColumns_(sh, def, head);
   if (head.length >= def.headers.length || head.some((h, i) => h !== def.headers[i])) return;
   def.headers.slice(head.length).forEach((h, k) => {
     const col = head.length + k + 1;

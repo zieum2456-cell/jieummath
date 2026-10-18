@@ -192,6 +192,22 @@ test('명단: 학생 삭제는 명단 줄만 지우고 수업기록은 남긴다
   assert.deepEqual(rec.map((x) => x.학생번호), ['43', '73']);
 });
 
+test('수업기록: 옛 오답원인 열은 교정주안점으로 이름과 값을 바꾼다', () => {
+  const g = loadGas();
+  const old = g.ss.insertSheet('수업기록');
+  const headers = ['기록ID'].concat(C.HEADERS.map((h) => (h === '교정주안점' ? '오답원인' : h)));
+  old.appendRow(headers);
+  const col = headers.indexOf('오답원인') + 1;
+  old.appendRow(['2026-10-01_56', '2026-10-01', '56']);
+  old.getRange(2, col).setValue('개념 이해 부족; 계산 실수');
+  g.ctx.setup();
+  const rec = g.ss.getSheetByName('수업기록').objects();
+  assert.equal(rec[0].교정주안점, '개념 재학습/오개념 수정; 계산 실수 교정');
+  assert.equal(rec[0].오답원인, undefined);
+  g.ctx.setup(); // 두 번 실행해도 그대로
+  assert.equal(g.ss.getSheetByName('수업기록').objects()[0].교정주안점, '개념 재학습/오개념 수정; 계산 실수 교정');
+});
+
 test('명단: Firebase 읽기 실패 시 이유를 알려 준다', () => {
   const g = fresh({ firestoreStatus: 403 });
   assert.throws(() => g.ctx.api_fetchPaymentRoster(), /403 \/ 403.*Permission denied/);
