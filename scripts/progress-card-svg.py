@@ -4,6 +4,13 @@
 progress-card/CardSvg.html 을 만든다. (인쇄 탭이 이 양식 위에 학생번호·이름·날짜를 얹어 찍는다)
 카드 아래쪽 가운데(아래 기준점 사각형과 같은 높이)에 icons/jieum-logo-card.png 로고를 넣는다.
 
+PDF 양식에서 바꾸는 것 (2026-10-18 요청)
+- '오답 원인' 칸 → '교정 주안점' (보기: 개념 재학습/오개념 수정, 문제 읽기(조건 찾기), 계산 실수 교정, 풀이 과정 서술)
+- 학습 목표 아래 순서: 추가 포인트 → 오늘 과제 → 교정 주안점 → 학습태도
+새 글자는 Noto Sans KR(PDF 양식과 같은 글꼴 계열)에서 글자 모양을 뽑아 넣는다. 글꼴은 처음 실행할 때 내려받는다.
+
+  pip install fonttools
+
   python3 scripts/progress-card-svg.py [PDF 경로]
 
 pdftocairo(poppler-utils)가 필요하다. 양식 PDF를 바꾼 뒤에만 다시 실행하면 된다.
@@ -11,6 +18,7 @@ pdftocairo(poppler-utils)가 필요하다. 양식 PDF를 바꾼 뒤에만 다시
 import base64
 import re
 import subprocess
+import urllib.request
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
@@ -22,6 +30,11 @@ PDF = Path(sys.argv[1]) if len(sys.argv) > 1 else next(ROOT.glob('*OMR*A4*.pdf')
 OUT = ROOT / 'progress-card' / 'CardSvg.html'
 LOGO = ROOT / 'icons' / 'jieum-logo-card.png'
 LOGO_H = 22  # pt. 아래 기준점(y 375.7~385.7) 가운데에 맞추고, 마지막 줄(y 362.9) 아래 여백 안에 들어가는 크기
+FONT_DIR = Path.home() / '.cache' / 'jieummath-fonts'
+FONTS = {  # Google Fonts 의 Noto Sans KR
+    'R': 'https://fonts.gstatic.com/s/notosanskr/v40/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLQ.ttf',
+    'B': 'https://fonts.gstatic.com/s/notosanskr/v40/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzg01eLQ.ttf',
+}
 SVG = '{http://www.w3.org/2000/svg}'
 XLINK = '{http://www.w3.org/1999/xlink}href'
 
@@ -66,7 +79,101 @@ def emit(el):
     return '<%s%s>%s</%s>' % (tag, a, inner, tag) if inner else '<%s%s/>' % (tag, a)
 
 
-body = ''.join(emit(c) for c in card)
+
+
+def top_y(el):
+    """카드 안에서 요소의 위쪽 y (글자는 기준선 y)"""
+    if el.tag == SVG + 'g':
+        u = el.find(SVG + 'use')
+        return float(u.get('y')) if u is not None else None
+    if el.tag == SVG + 'path':
+        ys = [float(v) for v in re.findall(r'-?\d+\.?\d*', el.get('d'))][1::2]
+        t = el.get('transform')
+        if t:
+            a, b, c, d, e, f = [float(v) for v in re.findall(r'-?[\d.]+', t)]
+            ys = [d * y + f for y in ys]
+        return min(ys)
+    return None
+
+
+# 칸 구분선(굵은 회색 가로줄): 각 칸의 아래쪽 경계
+dividers = sorted(top_y(c) for c in card if c.tag == SVG + 'path' and c.get('fill', '').startswith('rgb(74.')
+                  and not c.get('stroke'))
+# 학습 목표 아래 네 칸: 오답 원인, 학습태도, 추가 포인트, 오늘 과제 (원래 순서)
+i = next(k for k, y in enumerate(dividers) if 250 < y < 260)
+edges = dividers[i:i + 5]
+OLD = ['mistake', 'attitude', 'points', 'homework']
+NEW = ['points', 'homework', 'mistake', 'attitude']
+band = {name: (edges[k], edges[k + 1]) for k, name in enumerate(OLD)}
+shift = {}
+y = edges[0]
+for name in NEW:
+    a, b = band[name]
+    shift[name] = y - a
+    y += b - a
+
+
+def band_of(el):
+    t = top_y(el)
+    if t is None:
+        return None
+    for name, (a, b) in band.items():
+        if a + 0.1 < t <= b + 0.1:
+            return name
+    return None
+
+
+fonts = {}
+
+
+def text_path(text, x, baseline, weight, size, space):
+    """글자를 SVG 경로로 (글꼴 없이도 똑같이 찍히게)"""
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.transformPen import TransformPen
+    from fontTools.ttLib import TTFont
+    if weight not in fonts:
+        FONT_DIR.mkdir(parents=True, exist_ok=True)
+        f = FONT_DIR / ('NotoSansKR-%s.ttf' % weight)
+        if not f.exists():
+            urllib.request.urlretrieve(FONTS[weight], f)
+        fonts[weight] = TTFont(f)
+    font = fonts[weight]
+    gs, cmap, hmtx = font.getGlyphSet(), font.getBestCmap(), font['hmtx']
+    k = size / 1000
+    pen = SVGPathPen(gs, ntos=lambda v: ('%.2f' % v).rstrip('0').rstrip('.'))
+    for ch in text:
+        if ch == ' ':
+            x += space
+            continue
+        name = cmap[ord(ch)]
+        gs[name].draw(TransformPen(pen, (k, 0, 0, -k, x, baseline)))
+        x += hmtx[name][0] * k
+    return '<path fill="#111" d="%s"/>' % pen.getCommands()
+
+
+# 교정 주안점 칸: 원래 '오답 원인' 칸의 글자 자리 그대로 (보기 동그라미는 원래 것을 쓴다)
+a = band['mistake'][0]
+LABEL = (17.54, a + 15.67)  # 칸 이름 기준선
+ROWS = [a + 14.25, a + 29.25]  # 보기 글자 기준선 (두 줄)
+COLS = [68.12, 171.8]  # 보기 글자 시작 x (두 칸)
+CHOICES = ['개념 재학습/오개념 수정', '문제 읽기(조건 찾기)', '계산 실수 교정', '풀이 과정 서술']
+# 크기는 PDF 양식 글자와 맞춤 (칸 이름 굵게 7.0pt 간격, 보기 6.88pt 간격; Noto Sans KR 한글 폭 0.92em)
+mistake_text = text_path('교정 주안점', LABEL[0], LABEL[1], 'B', 6.996 / 0.92, 1.98) + ''.join(
+    text_path(t, COLS[k % 2], ROWS[k // 2], 'R', 6.882 / 0.92, 2.12) for k, t in enumerate(CHOICES))
+
+parts = {name: [] for name in OLD}
+body = ''
+for c in card:
+    name = band_of(c)
+    if name is None:
+        body += emit(c)
+    elif name == 'mistake' and c.tag == SVG + 'g':
+        continue  # 옛 글자(오답 원인, 계산 실수 …)는 버린다
+    else:
+        parts[name].append(emit(c))
+parts['mistake'].append(mistake_text)
+for name in NEW:
+    body += '<g transform="translate(0,%.2f)">%s</g>' % (shift[name], ''.join(parts[name]))
 
 # 로고: 기준점 사각형 세로 가운데, 카드 가로 가운데
 marks = [p for p in card.iter(SVG + 'path') if p.get('fill') == 'rgb(0%, 0%, 0%)']

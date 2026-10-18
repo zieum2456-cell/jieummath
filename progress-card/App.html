@@ -1268,7 +1268,7 @@
     if (!s) return '<use href="#pc-card" width="284" height="399"/>';
     const next = C.nextClassDate(s.days, date);
     const md = `${+date.slice(5, 7)}/${+date.slice(8, 10)} (${C.weekday(date)})`
-      + (next ? ` · 다음 등원일: ${+next.slice(5, 7)}월 ${+next.slice(8, 10)}일 (${C.weekday(next)})` : '');
+      + (next ? ` · 다음 등원일: ${+next.slice(5, 7)}/${+next.slice(8, 10)} (${C.weekday(next)})` : '');
     const bubble = (digit, y) => `<rect x="${108.5 + 24 * digit}" y="${y}" width="8" height="14" rx="4" fill="#111"/>`;
     return '<use href="#pc-card" width="284" height="399"/>'
       + `<g transform="${PX}">${bubble(+s.no[0], 86.5)}${bubble(+s.no[1], 108.5)}</g>`
