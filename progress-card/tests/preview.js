@@ -13,9 +13,12 @@ const port = Number(process.argv[2]) || 8787;
 const g = loadGas({
   payment: {
     students: [
-      { no: '56', name: '김도윤', grade: '초4' },
-      { no: '43', name: '이지아', grade: '초5' },
-      { no: '73', name: '박채아', grade: '초4' },
+      { no: '56', name: '김도윤', grade: '초4', days: [2, 4] },
+      { no: '43', name: '이지아', grade: '초5', days: [1, 3, 5] },
+      { no: '73', name: '박채아', grade: '초4', days: [2, 5] },
+      { no: '09', name: '정우진', grade: '중1', days: [2, 4, 6] },
+      { no: '18', name: '한별', grade: '초6', days: [2] },
+      { no: '27', name: '최서연', grade: '초3', days: [2, 3] },
       { no: '', name: '번호없는학생', grade: '초3' },
     ],
   },

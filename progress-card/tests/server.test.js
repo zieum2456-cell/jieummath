@@ -144,6 +144,33 @@ test('명단: 결제일 관리에서 불러오기 → 반영, 디딤돌 레벨�
   assert.throws(() => g.ctx.api_addStudent({ no: '56', name: '도윤' }), /이미 명단에/);
 });
 
+test('명단: 등원 요일도 불러오고, 학생 수정 때는 그대로 둔다', () => {
+  const g = fresh({ payment: { students: [{ no: '56', name: '김도윤', grade: '초4', days: [5, 1, 3] }, { no: '43', name: '이지아', grade: '초5' }] } });
+  const r = plain(g.ctx.api_fetchPaymentRoster());
+  assert.deepEqual(r.students.map((s) => [s.no, s.days]), [['56', '월수금'], ['43', '']]);
+  g.ctx.api_applyRoster({ add: r.students, update: [], retire: [] });
+  assert.equal(g.ss.getSheetByName('학생명단').objects()[0].등원요일, '월수금');
+  let roster = plain(g.ctx.api_saveStudent({ no: '56', name: '김도윤', grade: '초4', level: '기본', memo: '메모' }));
+  assert.equal(roster[0].days, '월수금');
+  // 요일이 없는 명단(예전 붙여넣기 형식)으로 바꿀 때는 요일 유지, 있으면 바꿈
+  roster = plain(g.ctx.api_applyRoster({ add: [], update: [{ no: '56', name: '김도윤', grade: '초5' }, { no: '43', name: '이지아', grade: '초5', days: '화목' }], retire: [] }));
+  assert.deepEqual(roster.map((s) => [s.no, s.grade, s.days]), [['56', '초5', '월수금'], ['43', '초5', '화목']]);
+});
+
+test('명단: 등원요일 열이 없던 시트에는 열을 붙인다', () => {
+  const g = loadGas();
+  const old = g.ss.insertSheet('학생명단');
+  old.appendRow(['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시']);
+  old.appendRow(['56', '김도윤', '초4', '기본', 'A', '재원', '메모', '2026-10-10 10:00:00']);
+  g.ctx.setup();
+  const sh = g.ss.getSheetByName('학생명단');
+  assert.equal(sh.getRange(1, 9).getDisplayValues()[0][0], '등원요일');
+  const roster = plain(g.ctx.api_applyRoster({ add: [], update: [{ no: '56', name: '김도윤', grade: '초4', days: '월' }], retire: [] }));
+  assert.deepEqual(roster.map((s) => [s.level, s.group, s.memo, s.days]), [['기본', 'A', '메모', '월']]);
+  g.ctx.setup(); // 두 번 실행해도 열이 더 생기지 않음
+  assert.equal(sh.getLastColumn(), 9);
+});
+
 test('명단: Firebase 읽기 실패 시 이유를 알려 준다', () => {
   const g = fresh({ firestoreStatus: 403 });
   assert.throws(() => g.ctx.api_fetchPaymentRoster(), /403 \/ 403.*Permission denied/);

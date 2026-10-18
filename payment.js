@@ -271,11 +271,16 @@
    * 진도 카드 앱으로 보낼 명단 텍스트 (한 줄에 한 명: 번호<탭>이름<탭>학년)
    * 학생번호가 없는 학생은 빼고, 번호 순으로 정렬한다.
    */
+  /** 등원 요일 [1, 3, 5] → '월수금' (월요일부터) */
+  function daysText(days) {
+    return [...new Set(days || [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAYS[d] || '').join('');
+  }
+
   function rosterText(students) {
     return students
       .filter((s) => s.no)
       .sort((a, b) => a.no.localeCompare(b.no))
-      .map((s) => [s.no, s.name, s.grade || ''].join('\t'))
+      .map((s) => [s.no, s.name, s.grade || '', daysText(s.days)].join('\t'))
       .join('\n');
   }
 
@@ -309,5 +314,6 @@
     undoAdvance,
     normalizeNo,
     rosterText,
+    daysText,
   };
 });
