@@ -1194,10 +1194,17 @@
   const SHEET_W = 595.92;
   const SHEET_H = 841.92;
   const SLOTS = [[7, 11], [305, 11], [7, 431], [305, 431]];
+  // A6(105×148mm = 297.64×419.53pt) 한 장에 카드 하나를 가운데에
+  const A6_W = 297.64;
+  const A6_H = 419.53;
+  const PAPERS = {
+    a4: { per: 4, label: 'A4', size: 'A4', w: '210mm', h: '296mm' },
+    a6: { per: 1, label: 'A6', size: '105mm 148mm', w: '105mm', h: '147.5mm' },
+  };
   // 양식 안 학생번호 칸: 화면 픽셀 좌표(십의 자리 y=86.5, 일의 자리 y=108.5, 숫자마다 24씩) → pt 변환
   const PX = 'matrix(0.712404,0,0,0.712404,0.442753,0.24626)';
   const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  S.print = { date: '', off: [], extra: [], blank: store.get('print-blank') === '1' };
+  S.print = { date: '', off: [], extra: [], blank: store.get('print-blank') === '1', paper: store.get('print-paper') === 'a6' ? 'a6' : 'a4' };
 
   function printPeople() {
     const P = S.print;
@@ -1216,7 +1223,13 @@
       + `<text x="254" y="38.7" font-size="11" font-weight="700" fill="#111" text-anchor="end" font-family='${FONT}'>${esc(s.name)}</text>`;
   }
 
-  function sheetsSvg(people, date, blank) {
+  function sheetsSvg(people, date, blank, paper) {
+    if (paper === 'a6') {
+      const x = ((A6_W - 284) / 2).toFixed(2);
+      const y = ((A6_H - 399) / 2).toFixed(2);
+      return people.map((s) => `<svg class="sheet a6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${A6_W} ${A6_H}" preserveAspectRatio="xMidYMin meet">`
+        + `<rect width="${A6_W}" height="${A6_H}" fill="#fff"/><g transform="translate(${x},${y})">${cardSvg(s, date)}</g></svg>`).join('');
+    }
     return C.toSheets(people, 4).map((page) => {
       const cards = page.map((s, i) => (s || blank ? `<g transform="translate(${SLOTS[i][0]},${SLOTS[i][1]})">${cardSvg(s, date)}</g>` : '')).join('');
       const cut = 'stroke="#b0b0b0" stroke-width="0.75" stroke-dasharray="2.25 1.5"';
@@ -1231,12 +1244,16 @@
     if (!P.date) P.date = today();
     $('print-date').value = P.date;
     $('print-blank').checked = P.blank;
+    const paper = PAPERS[P.paper];
+    document.querySelectorAll('#print-paper button').forEach((b) => b.classList.toggle('on', b.dataset.paper === P.paper));
+    $('print-blank-row').classList.toggle('hidden', P.paper !== 'a4');
+    $('print-page-style').textContent = `@page { size: ${paper.size}; margin: 0; } @media print { .print-sheets svg.sheet { width: ${paper.w}; height: ${paper.h}; } }`;
     const { base, extra, picked } = printPeople();
     const noDays = !S.roster.some((s) => s.status !== '퇴원' && s.days);
     const wd = C.weekday(P.date);
     $('print-info').innerHTML = noDays
       ? '<span style="color:var(--warn)">명단에 등원 요일이 없습니다. <b>명단</b> 탭에서 [결제일 관리에서 불러오기]를 한 번 해 주세요.</span>'
-      : `${esc(wd)}요일 등원 ${base.length}명${extra.length ? ` + 추가 ${extra.length}명` : ''} · 인쇄 ${picked.length}장 (A4 ${Math.ceil(picked.length / 4)}쪽)`;
+      : `${esc(wd)}요일 등원 ${base.length}명${extra.length ? ` + 추가 ${extra.length}명` : ''} · 인쇄 ${picked.length}장 (${paper.label} ${Math.ceil(picked.length / paper.per)}쪽)`;
     const row = (s, checked, kind) => `<label class="check"><input type="checkbox" data-print="${kind}" data-no="${esc(s.no)}" ${checked ? 'checked' : ''}>
       ${esc(s.no)} <b>${esc(s.name)}</b> <span class="muted">${esc([s.grade, s.days].filter(Boolean).join(' · '))}</span></label>`;
     $('print-list').innerHTML = base.map((s) => row(s, P.off.indexOf(s.no) < 0, 'base')).join('')
@@ -1248,7 +1265,8 @@
       + others.map((s) => `<option value="${esc(s.no)}">${esc(s.no)} ${esc(s.name)}${s.days ? ` (${esc(s.days)})` : ''}</option>`).join('');
     $('print-add').disabled = !others.length;
     $('print-go').disabled = !picked.length;
-    $('print-sheets').innerHTML = sheetsSvg(picked, P.date, P.blank);
+    $('print-sheets').classList.toggle('a6', P.paper === 'a6');
+    $('print-sheets').innerHTML = sheetsSvg(picked, P.date, P.blank, P.paper);
   }
 
   function setPrintDate(d) {
@@ -1262,6 +1280,13 @@
   $('print-blank').addEventListener('change', (e) => {
     S.print.blank = e.target.checked;
     store.set('print-blank', e.target.checked ? '1' : '0');
+    renderPrint();
+  });
+  $('print-paper').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-paper]');
+    if (!b) return;
+    S.print.paper = b.dataset.paper;
+    store.set('print-paper', S.print.paper);
     renderPrint();
   });
   $('print-add').addEventListener('change', (e) => {
@@ -1283,12 +1308,13 @@
     const { picked } = printPeople();
     if (!picked.length) return;
     const title = `진도카드 ${P.date} (${C.weekday(P.date)}) ${picked.length}명`;
+    const paper = PAPERS[P.paper];
     const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)}</title><style>@page { size: A4; margin: 0; } html, body { margin: 0; background: #fff; }
-svg.sheet { display: block; width: 210mm; height: 296mm; break-after: page; page-break-after: always; }
+<title>${esc(title)}</title><style>@page { size: ${paper.size}; margin: 0; } html, body { margin: 0; background: #fff; }
+svg.sheet { display: block; width: ${paper.w}; height: ${paper.h}; break-after: page; page-break-after: always; }
 svg.sheet:last-of-type { break-after: auto; page-break-after: auto; }
-@media screen { body { background: #888; } svg.sheet { margin: 12px auto; width: min(210mm, 96vw); height: auto; } }</style></head><body>
-${$('pc-card-defs').outerHTML}${sheetsSvg(picked, P.date, P.blank)}
+@media screen { body { background: #888; } svg.sheet { margin: 12px auto; width: min(${paper.w}, 96vw); height: auto; } }</style></head><body>
+${$('pc-card-defs').outerHTML}${sheetsSvg(picked, P.date, P.blank, P.paper)}
 <script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });<\/script></body></html>`;
     let w = null;
     try {

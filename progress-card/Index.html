@@ -4,6 +4,7 @@
 <base target="_top">
 <meta charset="utf-8">
 <?!= include('Styles'); ?>
+<style id="print-page-style"></style>
 </head>
 <body>
 <header class="top">
@@ -117,11 +118,15 @@
       <div class="row" style="margin-top:8px">
         <select id="print-add" aria-label="다른 학생 추가" style="max-width:260px"></select>
       </div>
-      <label class="check" style="margin-top:10px"><input type="checkbox" id="print-blank"> 남는 칸에 빈 카드 넣기</label>
+      <div class="seg" id="print-paper" style="margin-top:10px">
+        <button data-paper="a4">A4 용지에 4장</button>
+        <button data-paper="a6">A6 용지에 1장</button>
+      </div>
+      <label class="check" id="print-blank-row" style="margin-top:6px"><input type="checkbox" id="print-blank"> 남는 칸에 빈 카드 넣기</label>
       <div class="row" style="margin-top:12px">
         <button class="btn primary" id="print-go">인쇄</button>
       </div>
-      <p class="muted">카드마다 학생번호 칸이 미리 칠해지고, 위쪽에 날짜와 이름이 찍힙니다. 인쇄 창에서 <b>용지 A4 · 배율 100%(실제 크기)</b>로 맞춰 주세요.</p>
+      <p class="muted">카드마다 학생번호 칸이 미리 칠해지고, 위쪽에 날짜와 이름이 찍힙니다. 인쇄 창에서 <b>고른 용지(A4 또는 A6) · 배율 100%(실제 크기)</b>로 맞춰 주세요.</p>
     </div>
     <div id="print-sheets" class="print-sheets"></div>
   </section>
