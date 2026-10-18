@@ -323,6 +323,16 @@
       .sort((a, b) => a.no.localeCompare(b.no));
   }
 
+  /** 그 날짜 다음 등원일 (등원 요일 '월수금' 기준, 휴강·보강은 모름). 요일이 없으면 '' */
+  function nextClassDate(days, date) {
+    if (!validDate(date)) return '';
+    for (let i = 1; i <= 7; i++) {
+      const d = addDays(date, i);
+      if (String(days || '').indexOf(weekday(d)) >= 0) return d;
+    }
+    return '';
+  }
+
   /** 카드 목록을 A4 한 장에 n장씩 나눈다 (마지막 장의 빈 자리는 null) */
   function toSheets(cards, n) {
     const out = [];
@@ -426,7 +436,7 @@
   const api = {
     HEADERS, ENUMS, MULTI, RANGE_COLS, BOOKS, MARKS,
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
-    validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, toSheets,
+    validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, nextClassDate, toSheets,
     LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;

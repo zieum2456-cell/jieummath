@@ -157,6 +157,10 @@ test('카드 인쇄: 그 날짜 요일 등원생, 4장씩 나누기', () => {
   assert.deepEqual(C.studentsOn(roster, ''), []);
   assert.deepEqual(C.toSheets([1, 2, 3, 4, 5], 4), [[1, 2, 3, 4], [5, null, null, null]]);
   assert.deepEqual(C.toSheets([], 4), []);
+  assert.equal(C.nextClassDate('화목', '2026-10-20'), '2026-10-22'); // 화 → 목
+  assert.equal(C.nextClassDate('화목', '2026-10-22'), '2026-10-27'); // 목 → 다음 주 화
+  assert.equal(C.nextClassDate('화', '2026-10-20'), '2026-10-27'); // 주 1회 → 일주일 뒤
+  assert.equal(C.nextClassDate('', '2026-10-20'), '');
 });
 
 /* ---------- 2단계: 기간 · 집계 ---------- */
