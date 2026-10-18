@@ -988,6 +988,11 @@
         localStorage.setItem('pc-' + k, v);
       } catch (e) { /* 무시 */ }
     },
+    del: (k) => {
+      try {
+        localStorage.removeItem('pc-' + k);
+      } catch (e) { /* 무시 */ }
+    },
   };
   S.records = null;
   S.period = { preset: store.get('period') || '2w' };
@@ -1125,25 +1130,41 @@
     renderReport(st, recs);
   }
 
-  /* 학부모 2주 리포트: 기록으로 문구를 만들고, 지음쌤 한마디만 직접 적는다 */
-  const reportText = (st, recs) => C.parentReport({ name: st ? st.name : '', times: st ? st.times : '', grade: st ? st.grade : '', semester: st ? st.semester : '' }, recs,
-    { from: S.period.from, to: S.period.to, leftMode: leftMode(), note: store.get('note-' + S.stuNo) || '' });
+  /* 학부모 2주 리포트: 기록으로 문구를 만들고, 지음쌤 한마디는 추천 문구를 채워 두고 원장님이 고친다 */
+  const reportStu = (st) => ({ name: st ? st.name : '', times: st ? st.times : '', grade: st ? st.grade : '', semester: st ? st.semester : '' });
+  // 고친 한마디는 학생·기간별로 이 브라우저에 남긴다 (없으면 추천 문구)
+  const noteKey = () => `note-${S.stuNo}-${S.period.from || ''}-${S.period.to || ''}`;
+  const reportText = (st, recs, note) => C.parentReport(reportStu(st), recs, { from: S.period.from, to: S.period.to, leftMode: leftMode(), note });
   function renderReport(st, recs) {
     if (!recs.length) return ($('stu-report').innerHTML = '');
     const talks = recs.filter((r) => r.학습태도);
     const noTimes = !Object.keys(C.parseTimes(st && st.times)).length;
+    const suggested = C.suggestNote(reportStu(st), recs, { leftMode: leftMode() });
+    const saved = store.get(noteKey());
+    const note = saved != null ? saved : suggested;
     $('stu-report').innerHTML = `<div class="card"><h2>학부모 리포트</h2>
       ${noTimes ? '<div class="notice warn">명단에 등원 시각이 없어 지각을 셀 수 없습니다. [명단]에서 결제일 관리를 다시 불러오거나(수업 시간표의 시각을 가져옴) [수정]에서 적어 주세요.</div>'
         : `<p class="muted">지각: 정해진 등원 시각(${esc(st.times)})보다 ${C.LATE_GRACE}분 넘게 늦게 온 날만 셉니다.</p>`}
       <p class="muted">단원 이름: ${/^초[3-6]$/.test(st && st.grade || '') ? `${esc(st.grade)} ${st.semester ? `${esc(st.semester)} (명단에서 고정)` : '수업일 기준 학기 (2~7월 1학기, 8~1월 2학기)'}` : '초3~초6 학생만 단원 번호 옆에 이름을 붙입니다.'}</p>
       ${talks.length ? `<h3>이 기간 지음쌤 톡톡</h3><ul class="talks">${talks.map((r) => `<li>${md(r.수업일)} ${esc(r.학습태도)}</li>`).join('')}</ul>` : ''}
-      <label>지음쌤 한마디<textarea id="report-note" rows="3" placeholder="잘한 점 → 다음 2주 목표">${esc(store.get('note-' + S.stuNo) || '')}</textarea></label>
-      <h3>보낼 문구</h3><textarea id="report-text" class="report-text" rows="${reportText(st, recs).split('\n').length + 2}" readonly>${esc(reportText(st, recs))}</textarea>
+      <label>지음쌤 한마디 <span class="muted" id="report-note-state">${saved != null && saved !== suggested ? '고친 문구' : '추천 문구 (기간 기록으로 자동 작성, 바로 고칠 수 있어요)'}</span>
+        <textarea id="report-note" rows="4" placeholder="잘한 점 → 다음 2주 목표">${esc(note)}</textarea></label>
+      <div class="row"><button class="btn small" id="report-note-reset">추천 문구로 되돌리기</button></div>
+      <h3>보낼 문구</h3><textarea id="report-text" class="report-text" rows="${reportText(st, recs, note).split('\n').length + 2}" readonly>${esc(reportText(st, recs, note))}</textarea>
       <div class="row"><button class="btn primary" id="report-copy">문구 복사</button></div></div>`;
-    $('report-note').addEventListener('input', (e) => {
-      store.set('note-' + S.stuNo, e.target.value);
-      $('report-text').value = reportText(st, recs);
+    const update = (v) => {
+      $('report-text').value = reportText(st, recs, v);
       $('report-text').rows = $('report-text').value.split('\n').length + 2;
+      $('report-note-state').textContent = v === suggested ? '추천 문구 (기간 기록으로 자동 작성, 바로 고칠 수 있어요)' : '고친 문구';
+    };
+    $('report-note').addEventListener('input', (e) => {
+      store.set(noteKey(), e.target.value);
+      update(e.target.value);
+    });
+    $('report-note-reset').addEventListener('click', () => {
+      store.del(noteKey());
+      $('report-note').value = suggested;
+      update(suggested);
     });
     $('report-copy').addEventListener('click', async () => {
       const t = $('report-text');
