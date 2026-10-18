@@ -593,6 +593,24 @@ function api_changeNo(c) {
 }
 
 /**
+ * 명단에서 학생 한 명 지우기 (그 학생의 수업기록은 그대로 둔다)
+ * c: { no, dryRun } → { name, count: 남는 수업기록 수, roster }
+ */
+function api_deleteStudent(c) {
+  return withLock_(() => {
+    const no = String(c.no || '');
+    const r = readObjects_('roster').find((x) => x.학생번호 === no);
+    if (!r) throw new Error(`명단에 ${no}번 학생이 없습니다.`);
+    const count = readObjects_('records').filter((x) => x.학생번호 === no).length;
+    const out = { name: r.이름, count };
+    if (c.dryRun) return out;
+    sheet_('roster').deleteRow(r._row);
+    out.roster = rosterList_();
+    return out;
+  });
+}
+
+/**
  * 결제일 관리 앱(Firebase)에서 학생 명단 읽기
  * Firestore 문서 users/{로그인한 사람}/apps/payment 의 json 필드 → { students: [{no,name,grade,days}], noNumber: [이름] }
  *  days: 등원 요일 [1, 3, 5](0=일) → '월수금' (월요일부터)

@@ -74,6 +74,15 @@ class Sheet {
   }
   getMaxRows() { return this.maxRows; }
   insertRowsAfter(after, n) { this.maxRows += n; }
+  deleteRow(row) {
+    const next = new Map();
+    for (const [k, v] of this.cells) {
+      const [r, c] = k.split(',').map(Number);
+      if (r === row) continue;
+      next.set(this.key(r > row ? r - 1 : r, c), v);
+    }
+    this.cells = next;
+  }
   getRange(r, c, nr = 1, nc = 1) { return new Range(this, r, c, nr, nc); }
   getDataRange() { return new Range(this, 1, 1, Math.max(1, this.getLastRow()), Math.max(1, this.getLastColumn())); }
   appendRow(row) {

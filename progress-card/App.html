@@ -751,7 +751,7 @@
       if (S.editNo === s.no) return editRow(s, false);
       return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td><td>${esc(s.days)}</td>
           <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td><td class="muted">${esc(s.memo)}</td>
-          <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button></td></tr>`
+          <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button> <button class="btn small danger" data-del="${esc(s.no)}">삭제</button></td></tr>`
           + (S.chNo === s.no ? `<tr><td colspan="9"><div class="row">
             <span>${esc(s.no)}번 ${esc(s.name)} → 새 번호</span>
             <input id="chno-input" inputmode="numeric" maxlength="2" style="width:80px" autocomplete="off">
@@ -779,8 +779,9 @@
   });
 
   $('roster-body').addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-chno],[data-edit],[data-edit-save],[data-edit-cancel]');
+    const b = e.target.closest('[data-chno],[data-edit],[data-edit-save],[data-edit-cancel],[data-del]');
     if (!b) return;
+    if (b.dataset.del) return deleteStudent(b.dataset.del);
     if (b.dataset.chno) {
       S.chNo = S.chNo === b.dataset.chno ? null : b.dataset.chno;
       S.editNo = null;
@@ -815,6 +816,37 @@
       idle();
     }
   });
+
+  // 학생 삭제: 남는 수업기록 수를 먼저 확인하고, 한 번 더 물은 뒤 지운다
+  async function deleteStudent(no) {
+    busy('확인 중…');
+    let plan;
+    try {
+      plan = await run('api_deleteStudent', { no, dryRun: true });
+    } catch (e) {
+      idle();
+      return alert(e.message);
+    }
+    idle();
+    const msg = `${no}번 ${plan.name} 학생을 명단에서 삭제할까요?\n\n`
+      + (plan.count ? `이 학생의 수업기록 ${plan.count}건은 지우지 않고 그대로 남습니다.\n` : '')
+      + '결제일 관리 앱에 이 학생이 남아 있으면 다음 불러오기 때 다시 "추가"로 나옵니다.\n'
+      + '그만둔 학생이라면 삭제 대신 [수정]에서 상태를 퇴원으로 바꿀 수도 있습니다.';
+    if (!confirm(msg)) return;
+    busy('삭제 중…');
+    try {
+      S.roster = (await run('api_deleteStudent', { no })).roster;
+      if (S.editNo === no) S.editNo = null;
+      if (S.chNo === no) S.chNo = null;
+      revalidate();
+      renderRoster();
+      toast(`${no}번 ${plan.name} 학생을 삭제했습니다.`);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      idle();
+    }
+  }
 
   // 학생번호 변경: 먼저 몇 건이 바뀌는지 확인하고, 한 번 더 물은 뒤 바꾼다
   async function changeNo(from, input) {
