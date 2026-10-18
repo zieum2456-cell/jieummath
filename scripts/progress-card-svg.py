@@ -2,11 +2,13 @@
 """
 진도 카드 빈 양식(진도_OMR_카드_A4_4장.pdf)에서 카드 한 장을 SVG로 뽑아
 progress-card/CardSvg.html 을 만든다. (인쇄 탭이 이 양식 위에 학생번호·이름·날짜를 얹어 찍는다)
+카드 아래쪽 가운데(아래 기준점 사각형과 같은 높이)에 icons/jieum-logo-card.png 로고를 넣는다.
 
   python3 scripts/progress-card-svg.py [PDF 경로]
 
 pdftocairo(poppler-utils)가 필요하다. 양식 PDF를 바꾼 뒤에만 다시 실행하면 된다.
 """
+import base64
 import re
 import subprocess
 import sys
@@ -18,6 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 # 파일 이름이 맥에서 올린 자모 분리형(NFD)일 수 있어 이름 대신 모양으로 찾는다
 PDF = Path(sys.argv[1]) if len(sys.argv) > 1 else next(ROOT.glob('*OMR*A4*.pdf'))
 OUT = ROOT / 'progress-card' / 'CardSvg.html'
+LOGO = ROOT / 'icons' / 'jieum-logo-card.png'
+LOGO_H = 22  # pt. 아래 기준점(y 375.7~385.7) 가운데에 맞추고, 마지막 줄(y 362.9) 아래 여백 안에 들어가는 크기
 SVG = '{http://www.w3.org/2000/svg}'
 XLINK = '{http://www.w3.org/1999/xlink}href'
 
@@ -63,6 +67,16 @@ def emit(el):
 
 
 body = ''.join(emit(c) for c in card)
+
+# 로고: 기준점 사각형 세로 가운데, 카드 가로 가운데
+marks = [p for p in card.iter(SVG + 'path') if p.get('fill') == 'rgb(0%, 0%, 0%)']
+ys = [float(v) for v in re.findall(r'L [\d.]+ ([\d.]+)', marks[-1].get('d'))]
+mid_y = (min(ys) + max(ys)) / 2
+png = LOGO.read_bytes()
+lw, lh = int.from_bytes(png[16:20], 'big'), int.from_bytes(png[20:24], 'big')
+logo_w = LOGO_H * lw / lh
+body += '<image x="%.2f" y="%.2f" width="%.2f" height="%.2f" href="data:image/png;base64,%s"/>' % (
+    (float(width) - logo_w) / 2, mid_y - LOGO_H / 2, logo_w, LOGO_H, base64.b64encode(png).decode())
 defs = ''.join(
     '<path id="pc-%s" d="%s"/>' % (sid, short(by_id[gid].find(SVG + 'path').get('d', '')) if by_id[gid].find(SVG + 'path') is not None else '')
     for gid, sid in glyphs.items()
