@@ -420,7 +420,7 @@
     { f: '오늘진도범위', type: 'range' },
     { f: '추가포인트범위', type: 'range' },
     { f: '오늘과제', type: 'range' },
-    { f: '학습태도', label: '지음쌤 톡', type: 'area', wide: true },
+    { f: '학습태도', label: '지음쌤 톡톡', type: 'area', wide: true },
   ];
   const TIME_FIELDS = ['등원', '하원', '수업시간(분)'];
 
@@ -487,7 +487,7 @@
     if (ex) {
       html += `<div class="dup-box"><b>이미 저장된 기록이 있습니다</b> <span class="muted">(${esc(ex.저장일시)} 저장${ex.수정일시 ? ', ' + esc(ex.수정일시) + ' 수정' : ''})</span>
         <dl><dt>출결</dt><dd>${esc(ex.출결)} ${esc(ex.등원)}~${esc(ex.하원)}</dd><dt>학습 단계</dt><dd>${esc(ex.단계)} · ${esc(ex.진행률)}</dd>
-        <dt>오늘진도</dt><dd>${esc(ex.오늘진도범위)}</dd><dt>오늘과제</dt><dd>${esc(ex.오늘과제)}</dd><dt>지음쌤 톡</dt><dd>${esc(ex.학습태도)}</dd></dl>
+        <dt>오늘진도</dt><dd>${esc(ex.오늘진도범위)}</dd><dt>오늘과제</dt><dd>${esc(ex.오늘과제)}</dd><dt>지음쌤 톡톡</dt><dd>${esc(ex.학습태도)}</dd></dl>
         <div class="seg"><button type="button" data-act="dup" data-val="skip" class="${c.dupChoice === 'skip' ? 'on' : ''}">건너뛰기 (기존 기록 유지)</button>
         <button type="button" data-act="dup" data-val="overwrite" class="${c.dupChoice === 'overwrite' ? 'on' : ''}">덮어쓰기</button></div></div>`;
     }
@@ -1085,7 +1085,7 @@
         ${row('추가 포인트', chips(r.추가포인트범위))}
         ${row('오늘 과제', chips(r.오늘과제))}
         ${row('학습 주안점', esc(C.splitList(r.학습주안점).join(', ')))}
-        ${row('지음쌤 톡', esc(r.학습태도).replace(/\n/g, '<br>'))}
+        ${row('지음쌤 톡톡', esc(r.학습태도).replace(/\n/g, '<br>'))}
       </div></div>`;
   }
   document.addEventListener('click', (e) => {
