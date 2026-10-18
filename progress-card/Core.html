@@ -256,7 +256,17 @@
     return /^\d{1,2}$/.test(s) ? s.padStart(2, '0') : null;
   }
 
-  /** 붙여넣은 명단 텍스트(번호 이름 학년, 탭·쉼표·공백 구분) → { list, invalid } */
+  /** 등원 요일 글자 정리: '수, 월 금' → '월수금' (월요일부터, 요일 글자만) */
+  function normalizeDays(input) {
+    const s = nfc(input);
+    return '월화수목금토일'.split('').filter((d) => s.indexOf(d) >= 0).join('');
+  }
+  const isDays = (t) => /^[월화수목금토일]+$/.test(t);
+
+  /**
+   * 붙여넣은 명단 텍스트(번호 이름 [학년] [등원 요일], 탭·쉼표·공백 구분) → { list, invalid }
+   * 등원 요일('월수금')이 있는 줄만 days 를 넣는다 (없으면 지금 명단의 요일을 그대로 둔다)
+   */
   function parseRosterText(text) {
     const list = [];
     const invalid = [];
@@ -267,7 +277,11 @@
       const no = normalizeNo(parts[0]);
       if (no == null || !parts[1]) return invalid.push({ line: i + 1, text: t, reason: '번호(숫자 두 자리)와 이름이 필요합니다.' });
       if (list.some((s) => s.no === no)) return invalid.push({ line: i + 1, text: t, reason: `${no}번이 두 번 들어 있습니다.` });
-      list.push({ no, name: parts[1], grade: parts[2] || '' });
+      const rest = parts.slice(2);
+      const days = rest.find(isDays);
+      const item = { no, name: parts[1], grade: rest.find((t) => !isDays(t)) || '' };
+      if (days) item.days = normalizeDays(days);
+      list.push(item);
     });
     return { list, invalid };
   }
@@ -277,6 +291,7 @@
    * → { add, update: [{ no, from, to }], missing, same }
    *  - 학년은 불러온 쪽에 값이 있을 때만 바꾼다
    *  - 퇴원으로 표시된 학생이 다시 나오면 재원으로 되돌린다(update)
+   *  - 등원 요일은 불러온 쪽에 days 가 있을 때만 비교한다
    */
   function diffRoster(current, incoming) {
     const add = [];
@@ -284,14 +299,39 @@
     let same = 0;
     incoming.forEach((s) => {
       const c = current.find((x) => x.no === s.no);
-      if (!c) return add.push({ no: s.no, name: s.name, grade: s.grade || '' });
-      const to = { name: s.name, grade: s.grade || c.grade || '', status: '재원' };
-      const from = { name: c.name, grade: c.grade || '', status: c.status || '재원' };
-      if (to.name !== from.name || to.grade !== from.grade || to.status !== from.status) update.push({ no: s.no, from, to });
+      if (!c) return add.push({ no: s.no, name: s.name, grade: s.grade || '', days: s.days || '' });
+      const to = { name: s.name, grade: s.grade || c.grade || '', days: s.days != null ? s.days : c.days || '', status: '재원' };
+      const from = { name: c.name, grade: c.grade || '', days: c.days || '', status: c.status || '재원' };
+      if (['name', 'grade', 'days', 'status'].some((k) => to[k] !== from[k])) update.push({ no: s.no, from, to });
       else same++;
     });
     const missing = current.filter((c) => c.status !== '퇴원' && !incoming.some((s) => s.no === c.no)).map((c) => ({ no: c.no, name: c.name }));
     return { add, update, missing, same };
+  }
+
+  /* ---------- 카드 인쇄 ---------- */
+
+  /**
+   * 그 날짜 요일에 등원하는 재원생 (번호 순)
+   * roster: [{ no, name, days: '월수금', status }], date: 'YYYY-MM-DD'
+   */
+  function studentsOn(roster, date) {
+    const wd = weekday(date);
+    if (!wd) return [];
+    return roster
+      .filter((s) => s.status !== '퇴원' && String(s.days || '').indexOf(wd) >= 0)
+      .sort((a, b) => a.no.localeCompare(b.no));
+  }
+
+  /** 카드 목록을 A4 한 장에 n장씩 나눈다 (마지막 장의 빈 자리는 null) */
+  function toSheets(cards, n) {
+    const out = [];
+    for (let i = 0; i < cards.length; i += n) {
+      const page = cards.slice(i, i + n);
+      while (page.length < n) page.push(null);
+      out.push(page);
+    }
+    return out;
   }
 
   /* ---------- 기간 · 집계 (2단계) ---------- */
@@ -386,7 +426,7 @@
   const api = {
     HEADERS, ENUMS, MULTI, RANGE_COLS, BOOKS, MARKS,
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
-    validateCard, canonical, rankOf, normalizeNo, parseRosterText, diffRoster,
+    validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, toSheets,
     LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;

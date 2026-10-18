@@ -4,6 +4,7 @@
 <base target="_top">
 <meta charset="utf-8">
 <?!= include('Styles'); ?>
+<style id="print-page-style"></style>
 </head>
 <body>
 <header class="top">
@@ -17,6 +18,7 @@
     <button data-tab="student">학생</button>
     <button data-tab="day">날짜</button>
     <button data-tab="summary">집계</button>
+    <button data-tab="print">카드 인쇄</button>
     <button data-tab="roster">명단</button>
     <button data-tab="settings">설정</button>
   </nav>
@@ -102,18 +104,45 @@
     </div>
   </section>
 
+  <!-- 카드 인쇄 -->
+  <section id="tab-print" class="hidden">
+    <div class="card">
+      <h2>진도 카드 인쇄</h2>
+      <div class="row nowrap">
+        <button class="btn" id="print-prev" aria-label="전날">←</button>
+        <input type="date" id="print-date" class="date-input">
+        <button class="btn" id="print-next" aria-label="다음날">→</button>
+      </div>
+      <p class="muted" id="print-info"></p>
+      <div id="print-list"></div>
+      <div class="row" style="margin-top:8px">
+        <select id="print-add" aria-label="다른 학생 추가" style="max-width:260px"></select>
+      </div>
+      <div class="seg" id="print-paper" style="margin-top:10px">
+        <button data-paper="a4">A4 용지에 4장</button>
+        <button data-paper="a6">A6 용지에 1장</button>
+      </div>
+      <label class="check" id="print-blank-row" style="margin-top:6px"><input type="checkbox" id="print-blank"> 남는 칸에 빈 카드 넣기</label>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="print-go">인쇄</button>
+      </div>
+      <p class="muted">카드마다 학생번호 칸이 미리 칠해지고, 위쪽에 날짜와 이름이 찍힙니다. 인쇄 창에서 <b>고른 용지(A4 또는 A6) · 배율 100%(실제 크기)</b>로 맞춰 주세요.</p>
+    </div>
+    <div id="print-sheets" class="print-sheets"></div>
+  </section>
+
   <!-- 명단 -->
   <section id="tab-roster" class="hidden">
     <div class="card">
       <h2>명단 불러오기</h2>
-      <p class="muted">결제일 관리 앱의 학생번호·이름·학년을 가져옵니다. 디딤돌 레벨·발송 조·메모는 그대로 둡니다.</p>
+      <p class="muted">결제일 관리 앱의 학생번호·이름·학년·등원 요일을 가져옵니다. 디딤돌 레벨·발송 조·메모는 그대로 둡니다.</p>
       <div class="row">
         <button class="btn primary" id="import-payment">결제일 관리에서 불러오기</button>
         <button class="btn" id="paste-toggle">붙여넣어 불러오기</button>
       </div>
       <div id="paste-box" class="hidden">
-        <p class="muted">결제일 관리 앱 → 설정·백업 → <b>진도카드용 명단 복사</b>로 복사한 내용을 붙여 넣으세요. (한 줄에 한 명: 번호 이름 학년)</p>
-        <textarea id="paste-text" rows="6" placeholder="56	김도윤	초4"></textarea>
+        <p class="muted">결제일 관리 앱 → 설정·백업 → <b>진도카드용 명단 복사</b>로 복사한 내용을 붙여 넣으세요. (한 줄에 한 명: 번호 이름 학년 등원요일)</p>
+        <textarea id="paste-text" rows="6" placeholder="56	김도윤	초4	월수금"></textarea>
         <button class="btn" id="paste-preview">미리 보기</button>
       </div>
       <div id="roster-diff"></div>
@@ -123,9 +152,9 @@
         <h2 style="margin:0">학생 명단 <span id="roster-count" class="muted"></span></h2>
         <button class="btn small" id="stu-add">＋ 학생 추가</button>
       </div>
-      <p class="muted">[수정]에서 디딤돌 레벨·발송 조·상태·메모를 고칩니다. 이름·학년은 결제일 관리에서 불러올 때 그쪽 값으로 바뀝니다.</p>
+      <p class="muted">[수정]에서 디딤돌 레벨·발송 조·상태·메모를 고칩니다. 이름·학년·등원 요일은 결제일 관리에서 불러올 때 그쪽 값으로 바뀝니다.</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>번호</th><th>이름</th><th>학년</th><th>디딤돌 레벨</th><th>발송 조</th><th>상태</th><th>메모</th><th></th></tr></thead>
+        <thead><tr><th>번호</th><th>이름</th><th>학년</th><th>등원</th><th>디딤돌 레벨</th><th>발송 조</th><th>상태</th><th>메모</th><th></th></tr></thead>
         <tbody id="roster-body"></tbody>
       </table></div>
     </div>
@@ -158,6 +187,7 @@
 <div id="toast" class="toast hidden"></div>
 <div id="loading" class="loading hidden"><div class="spinner"></div><div id="loading-text"></div></div>
 
+<?!= include('CardSvg'); ?>
 <?!= include('Core'); ?>
 <?!= include('App'); ?>
 </body>

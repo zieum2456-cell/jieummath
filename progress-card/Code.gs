@@ -15,8 +15,9 @@ const CSV_HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', 
 const SHEETS = {
   roster: {
     name: '학생명단',
-    headers: ['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시'],
-    widths: [70, 90, 60, 110, 60, 60, 200, 140],
+    // 등원요일은 나중에 생긴 열이라 맨 뒤에 둔다 (이미 쓰던 시트는 ensureHeaders_ 가 열을 붙인다)
+    headers: ['학생번호', '이름', '학년', '디딤돌레벨', '발송조', '상태', '메모', '수정일시', '등원요일'],
+    widths: [70, 90, 60, 110, 60, 60, 200, 140, 70],
   },
   records: {
     name: '수업기록',
@@ -102,6 +103,8 @@ function ensureSheets_(ss) {
         sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat((def.numbers || []).indexOf(h) >= 0 ? '0' : '@');
         if (def.widths && def.widths[i]) sh.setColumnWidth(i + 1, def.widths[i]);
       });
+    } else {
+      ensureHeaders_(sh, def);
     }
   });
   const st = ss.getSheetByName(SHEETS.settings.name);
@@ -116,15 +119,32 @@ function ensureSheets_(ss) {
   });
 }
 
+/** 이미 쓰던 탭에 나중에 생긴 열(맨 뒤)이 없으면 붙인다. 기존 열 순서가 다르면 건드리지 않는다 */
+function ensureHeaders_(sh, def) {
+  const n = sh.getLastColumn();
+  const head = n ? sh.getRange(1, 1, 1, n).getDisplayValues()[0] : [];
+  if (head.length >= def.headers.length || head.some((h, i) => h !== def.headers[i])) return;
+  def.headers.slice(head.length).forEach((h, k) => {
+    const col = head.length + k + 1;
+    sh.getRange(1, col).setValue(h).setFontWeight('bold').setBackground('#eef2ff');
+    sh.getRange(1, col, sh.getMaxRows(), 1).setNumberFormat((def.numbers || []).indexOf(h) >= 0 ? '0' : '@');
+    if (def.widths && def.widths[col - 1]) sh.setColumnWidth(col, def.widths[col - 1]);
+  });
+}
+
 /* ---------- 시트 읽기/쓰기 도우미 ---------- */
 
+const checked_ = {};
 function sheet_(key) {
   const ss = ss_();
   let sh = ss.getSheetByName(SHEETS[key].name);
   if (!sh) {
     ensureSheets_(ss);
     sh = ss.getSheetByName(SHEETS[key].name);
+  } else if (!checked_[key]) {
+    ensureHeaders_(sh, SHEETS[key]);
   }
+  checked_[key] = true;
   return sh;
 }
 
@@ -243,7 +263,7 @@ function uniqueName_(folder, name) {
 function rosterList_() {
   return readObjects_('roster')
     .filter((r) => r.학생번호)
-    .map((r) => ({ no: r.학생번호, name: r.이름, grade: r.학년, level: r.디딤돌레벨, group: r.발송조, status: r.상태 || '재원', memo: r.메모 }));
+    .map((r) => ({ no: r.학생번호, name: r.이름, grade: r.학년, days: r.등원요일 || '', level: r.디딤돌레벨, group: r.발송조, status: r.상태 || '재원', memo: r.메모 }));
 }
 
 function api_init() {
@@ -485,7 +505,8 @@ function api_addStudent(s) {
 
 /**
  * 명단 불러오기 반영 (디딤돌레벨·발송조·메모는 그대로 둔다)
- * c: { add: [{no,name,grade}], update: [{no,name,grade}], retire: [no] }
+ * c: { add: [{no,name,grade,days}], update: [{no,name,grade,days}], retire: [no] }
+ *  - days(등원 요일, '월수금')가 없으면(예전 형식으로 붙여 넣은 명단) 지금 값을 그대로 둔다
  */
 function api_applyRoster(c) {
   return withLock_(() => {
@@ -495,6 +516,7 @@ function api_applyRoster(c) {
       const r = rows.find((x) => x.학생번호 === u.no);
       if (!r) return;
       Object.assign(r, { 이름: u.name, 학년: u.grade, 상태: '재원', 수정일시: time });
+      if (u.days != null) r.등원요일 = u.days;
       writeObject_('roster', r._row, r);
     });
     (c.retire || []).forEach((no) => {
@@ -504,7 +526,7 @@ function api_applyRoster(c) {
       writeObject_('roster', r._row, r);
     });
     const adds = (c.add || []).filter((a) => !rows.some((x) => x.학생번호 === a.no));
-    appendObjects_('roster', adds.map((a) => ({ 학생번호: a.no, 이름: a.name, 학년: a.grade || '', 상태: '재원', 수정일시: time })));
+    appendObjects_('roster', adds.map((a) => ({ 학생번호: a.no, 이름: a.name, 학년: a.grade || '', 등원요일: a.days || '', 상태: '재원', 수정일시: time })));
     return rosterList_();
   });
 }
@@ -572,7 +594,8 @@ function api_changeNo(c) {
 
 /**
  * 결제일 관리 앱(Firebase)에서 학생 명단 읽기
- * Firestore 문서 users/{로그인한 사람}/apps/payment 의 json 필드 → { students: [{no,name,grade}], noNumber: [이름] }
+ * Firestore 문서 users/{로그인한 사람}/apps/payment 의 json 필드 → { students: [{no,name,grade,days}], noNumber: [이름] }
+ *  days: 등원 요일 [1, 3, 5](0=일) → '월수금' (월요일부터)
  */
 function api_fetchPaymentRoster() {
   const projectId = settings_().파이어베이스프로젝트ID || 'jieummath';
@@ -602,13 +625,19 @@ function api_fetchPaymentRoster() {
   if (!docs.length) throw new Error('Firebase에서 결제일 관리 데이터를 찾지 못했습니다. 결제일 관리 앱에서 구글 로그인(온라인 저장)을 했는지 확인해 주세요.');
   const json = docs[0].fields && docs[0].fields.json && docs[0].fields.json.stringValue;
   const data = JSON.parse(json || '{}');
-  const students = (data.students || []).map((s) => ({ no: String(s.no || ''), name: String(s.name || '').trim(), grade: s.grade || '' }));
+  const students = (data.students || []).map((s) => ({ no: String(s.no || ''), name: String(s.name || '').trim(), grade: s.grade || '', days: daysText_(s.days) }));
   return {
     students: students.filter((s) => /^\d{2}$/.test(s.no)),
     noNumber: students.filter((s) => !/^\d{2}$/.test(s.no)).map((s) => s.name),
     updatedAt: docs[0].updateTime,
     accounts: docs.length,
   };
+}
+
+const WEEKDAYS_ = ['일', '월', '화', '수', '목', '금', '토'];
+function daysText_(days) {
+  const list = (Array.isArray(days) ? days : []).map(Number).filter((d) => d >= 0 && d <= 6);
+  return list.filter((d, i) => list.indexOf(d) === i).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAYS_[d]).join('');
 }
 
 function errorText_(res) {
@@ -652,7 +681,8 @@ function api_saveStudent(s) {
     if (STATUSES.indexOf(status) < 0) throw new Error('상태는 재원 또는 퇴원이어야 합니다.');
     const rows = readObjects_('roster');
     const r = rows.find((x) => x.학생번호 === no);
-    const obj = { 학생번호: no, 이름: name, 학년: s.grade || '', 디딤돌레벨: s.level || '', 발송조: s.group || '', 상태: status, 메모: s.memo || '', 수정일시: now_() };
+    // 등원요일은 결제일 관리에서 불러올 때만 바뀐다
+    const obj = { 학생번호: no, 이름: name, 학년: s.grade || '', 디딤돌레벨: s.level || '', 발송조: s.group || '', 상태: status, 메모: s.memo || '', 수정일시: now_(), 등원요일: r ? r.등원요일 : '' };
     if (s.isNew) {
       if (r) throw new Error(`${no}번은 이미 ${r.이름} 학생이 쓰고 있습니다.`);
       appendObjects_('roster', [obj]);

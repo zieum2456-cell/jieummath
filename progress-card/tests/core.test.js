@@ -122,18 +122,41 @@ test('저장용 정리: 여러 개 칸 구분자 통일', () => {
 });
 
 test('명단 붙여넣기 해석과 비교', () => {
-  const { list, invalid } = C.parseRosterText('56\t김도윤\t초4\n7, 박하늘, 초3\n\nxx 이름\n56 중복');
-  assert.deepEqual(list, [{ no: '56', name: '김도윤', grade: '초4' }, { no: '07', name: '박하늘', grade: '초3' }]);
+  const { list, invalid } = C.parseRosterText('56\t김도윤\t초4\n7, 박하늘, 초3\n\nxx 이름\n56 중복\n08\t한별\t\t화목\n09 정우 금월 중1');
+  assert.deepEqual(list, [
+    { no: '56', name: '김도윤', grade: '초4' },
+    { no: '07', name: '박하늘', grade: '초3' },
+    { no: '08', name: '한별', grade: '', days: '화목' },
+    { no: '09', name: '정우', grade: '중1', days: '월금' },
+  ]);
   assert.equal(invalid.length, 2);
   const current = [
-    { no: '56', name: '김도윤', grade: '초3', status: '재원' },
+    { no: '56', name: '김도윤', grade: '초3', days: '월수', status: '재원' },
     { no: '43', name: '이지아', grade: '초5', status: '재원' },
     { no: '10', name: '최퇴원', grade: '', status: '퇴원' },
+    { no: '08', name: '한별', grade: '초6', days: '화', status: '재원' },
   ];
   const d = C.diffRoster(current, list);
-  assert.deepEqual(d.add, [{ no: '07', name: '박하늘', grade: '초3' }]);
-  assert.deepEqual(d.update.map((u) => [u.no, u.to.grade]), [['56', '초4']]);
+  assert.deepEqual(d.add, [{ no: '07', name: '박하늘', grade: '초3', days: '' }, { no: '09', name: '정우', grade: '중1', days: '월금' }]);
+  // 요일 없는 줄은 지금 요일 유지, 요일만 바뀌어도 변경으로 잡는다
+  assert.deepEqual(d.update.map((u) => [u.no, u.to.grade, u.to.days]), [['56', '초4', '월수'], ['08', '초6', '화목']]);
   assert.deepEqual(d.missing, [{ no: '43', name: '이지아' }]);
+  assert.equal(C.normalizeDays('수, 월 금'), '월수금');
+});
+
+test('카드 인쇄: 그 날짜 요일 등원생, 4장씩 나누기', () => {
+  const roster = [
+    { no: '56', name: '김도윤', days: '월수금', status: '재원' },
+    { no: '07', name: '박하늘', days: '화목', status: '재원' },
+    { no: '12', name: '최퇴원', days: '화', status: '퇴원' },
+    { no: '03', name: '한별', days: '화', status: '재원' },
+    { no: '20', name: '요일없음', days: '', status: '재원' },
+  ];
+  assert.deepEqual(C.studentsOn(roster, '2026-10-20').map((s) => s.no), ['03', '07']); // 화요일
+  assert.deepEqual(C.studentsOn(roster, '2026-10-19').map((s) => s.no), ['56']);
+  assert.deepEqual(C.studentsOn(roster, ''), []);
+  assert.deepEqual(C.toSheets([1, 2, 3, 4, 5], 4), [[1, 2, 3, 4], [5, null, null, null]]);
+  assert.deepEqual(C.toSheets([], 4), []);
 });
 
 /* ---------- 2단계: 기간 · 집계 ---------- */

@@ -142,9 +142,10 @@ test('진도카드용 명단 텍스트: 번호 순, 번호 없는 학생 제외'
   const students = [
     { no: '56', name: '김도윤', grade: '초4' },
     { no: '', name: '이번호없음', grade: '초5' },
-    { no: '07', name: '박지아' },
+    { no: '07', name: '박지아', days: [5, 1, 3] },
   ];
-  assert.equal(P.rosterText(students), '07\t박지아\t\n56\t김도윤\t초4');
+  assert.equal(P.rosterText(students), '07\t박지아\t\t월수금\n56\t김도윤\t초4\t');
+  assert.equal(P.daysText([0, 6, 2]), '화토일');
 });
 
 test('회차 차감 결강만 있으면 결강 줄 없이 결강(회차차감) 줄만 표시', () => {

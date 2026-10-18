@@ -58,11 +58,12 @@
 
   function show(tab) {
     S.tab = tab;
-    ['upload', 'review', 'student', 'day', 'summary', 'roster', 'settings'].forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== tab));
+    ['upload', 'review', 'student', 'day', 'summary', 'print', 'roster', 'settings'].forEach((t) => $('tab-' + t).classList.toggle('hidden', t !== tab));
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     $('savebar').classList.toggle('hidden', tab !== 'review' || !S.cards.length);
     if (tab === 'review') renderReview();
     if (tab === 'roster') renderRoster();
+    if (tab === 'print') renderPrint();
     if (tab === 'settings') renderSettings();
     if (TRACK_TABS.indexOf(tab) >= 0) ensureRecords().then((ok) => ok && S.tab === tab && renderTracking());
     window.scrollTo(0, 0);
@@ -730,7 +731,7 @@
   function editRow(s, isNew) {
     const opt = (list, v, blank) => (blank ? `<option value="">${blank}</option>` : '')
       + [...list, ...(v && list.indexOf(v) < 0 ? [v] : [])].map((o) => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('');
-    return `<tr class="editing"><td colspan="8"><div class="edit-grid">
+    return `<tr class="editing"><td colspan="9"><div class="edit-grid">
       <label>학생번호<input data-f="no" value="${esc(s.no)}" inputmode="numeric" maxlength="2" ${isNew ? '' : 'disabled'} autocomplete="off"></label>
       <label>이름<input data-f="name" value="${esc(s.name)}" autocomplete="off"></label>
       <label>학년<select data-f="grade">${opt(C.GRADES, s.grade, '-')}</select></label>
@@ -748,17 +749,17 @@
     $('roster-count').textContent = `(재원 ${list.filter((s) => s.status !== '퇴원').length}명)`;
     const rows = list.map((s) => {
       if (S.editNo === s.no) return editRow(s, false);
-      return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td>
+      return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td><td>${esc(s.days)}</td>
           <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td><td class="muted">${esc(s.memo)}</td>
           <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button></td></tr>`
-          + (S.chNo === s.no ? `<tr><td colspan="8"><div class="row">
+          + (S.chNo === s.no ? `<tr><td colspan="9"><div class="row">
             <span>${esc(s.no)}번 ${esc(s.name)} → 새 번호</span>
             <input id="chno-input" inputmode="numeric" maxlength="2" style="width:80px" autocomplete="off">
             <button class="btn small primary" id="chno-go">변경</button><button class="btn small" id="chno-cancel">취소</button></div>
             <div class="muted">이 학생의 수업기록(학생번호·기록ID)도 함께 바뀝니다. 결제일 관리 앱의 학생번호는 따로 바꿔 주세요.</div></td></tr>` : '');
     });
     if (S.editNo === 'new') rows.unshift(editRow({ no: '', name: '', grade: '', level: '', group: '', status: '재원', memo: '' }, true));
-    $('roster-body').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="8" class="empty">명단이 비어 있습니다. 위에서 불러오세요.</td></tr>';
+    $('roster-body').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="9" class="empty">명단이 비어 있습니다. 위에서 불러오세요.</td></tr>';
     renderRosterDiff();
     const input = $('chno-input');
     if (input) {
@@ -858,8 +859,8 @@
     if (d.noNumber && d.noNumber.length) html += `<div class="muted" style="color:var(--warn)">학생번호가 없어 건너뛴 학생: ${d.noNumber.map(esc).join(', ')}</div>`;
     if (d.invalid && d.invalid.length) html += `<div class="muted" style="color:var(--warn)">읽지 못한 줄: ${d.invalid.map((x) => `${x.line}번째 줄 "${esc(x.text)}"(${esc(x.reason)})`).join(', ')}</div>`;
     html += '<ul class="diff-list">';
-    html += d.add.map((s) => item('add', s.no, `<span class="badge ok">추가</span> ${esc(s.no)} ${esc(s.name)} ${esc(s.grade)}`, true)).join('');
-    html += d.update.map((u) => item('update', u.no, `<span class="badge warn">변경</span> ${esc(u.no)} ${esc(u.from.name)} ${esc(u.from.grade)}${u.from.status === '퇴원' ? '(퇴원)' : ''} → <b>${esc(u.to.name)} ${esc(u.to.grade)}</b>`, true)).join('');
+    html += d.add.map((s) => item('add', s.no, `<span class="badge ok">추가</span> ${esc(s.no)} ${esc(s.name)} ${esc(s.grade)} ${esc(s.days)}`, true)).join('');
+    html += d.update.map((u) => item('update', u.no, `<span class="badge warn">변경</span> ${esc(u.no)} ${esc(u.from.name)} ${esc(u.from.grade)} ${esc(u.from.days)}${u.from.status === '퇴원' ? '(퇴원)' : ''} → <b>${esc(u.to.name)} ${esc(u.to.grade)} ${esc(u.to.days)}</b>`, true)).join('');
     html += d.missing.map((s) => item('retire', s.no, `<span class="badge off">불러온 명단에 없음</span> ${esc(s.no)} ${esc(s.name)} → 퇴원으로 표시`, false)).join('');
     html += '</ul>';
     const n = d.add.length + d.update.length + d.missing.length;
@@ -878,7 +879,7 @@
       const upd = picked('update');
       const change = {
         add: d.add.filter((s) => add.indexOf(s.no) >= 0),
-        update: d.update.filter((u) => upd.indexOf(u.no) >= 0).map((u) => ({ no: u.no, name: u.to.name, grade: u.to.grade })),
+        update: d.update.filter((u) => upd.indexOf(u.no) >= 0).map((u) => ({ no: u.no, name: u.to.name, grade: u.to.grade, days: u.to.days })),
         retire: picked('retire'),
       };
       busy('명단 반영 중…');
@@ -1187,6 +1188,142 @@
   }
   $('set-done').addEventListener('change', (e) => saveSetting('두고옴처리', e.target.value));
   $('set-project-save').addEventListener('click', () => saveSetting('파이어베이스프로젝트ID', $('set-project').value.trim()));
+
+  /* ---------- 카드 인쇄: 그 날짜 요일에 오는 학생 카드를 A4 한 장에 4장씩 ---------- */
+  // 카드 양식은 CardSvg.html(#pc-card, 284×399pt = A6). A4(595.92×841.92pt)에 원래 양식 PDF와 같은 자리로 놓는다
+  const SHEET_W = 595.92;
+  const SHEET_H = 841.92;
+  const SLOTS = [[7, 11], [305, 11], [7, 431], [305, 431]];
+  // A6(105×148mm = 297.64×419.53pt) 한 장에 카드 하나를 가운데에
+  const A6_W = 297.64;
+  const A6_H = 419.53;
+  const PAPERS = {
+    a4: { per: 4, label: 'A4', size: 'A4', w: '210mm', h: '296mm' },
+    a6: { per: 1, label: 'A6', size: '105mm 148mm', w: '105mm', h: '147.5mm' },
+  };
+  // 양식 안 학생번호 칸: 화면 픽셀 좌표(십의 자리 y=86.5, 일의 자리 y=108.5, 숫자마다 24씩) → pt 변환
+  const PX = 'matrix(0.712404,0,0,0.712404,0.442753,0.24626)';
+  const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  S.print = { date: '', off: [], extra: [], blank: store.get('print-blank') === '1', paper: store.get('print-paper') === 'a6' ? 'a6' : 'a4' };
+
+  function printPeople() {
+    const P = S.print;
+    const base = C.studentsOn(S.roster, P.date);
+    const extra = P.extra.map((no) => S.roster.find((s) => s.no === no)).filter(Boolean);
+    return { base, extra, picked: [...base.filter((s) => P.off.indexOf(s.no) < 0), ...extra] };
+  }
+
+  function cardSvg(s, date) {
+    if (!s) return '<use href="#pc-card" width="284" height="399"/>';
+    const md = `${+date.slice(5, 7)}/${+date.slice(8, 10)} (${C.weekday(date)})`;
+    const bubble = (digit, y) => `<rect x="${108.5 + 24 * digit}" y="${y}" width="8" height="14" rx="4" fill="#111"/>`;
+    return '<use href="#pc-card" width="284" height="399"/>'
+      + `<g transform="${PX}">${bubble(+s.no[0], 86.5)}${bubble(+s.no[1], 108.5)}</g>`
+      + `<text x="76" y="38.7" font-size="8" fill="#555" font-family='${FONT}'>${esc(md)}</text>`
+      + `<text x="254" y="38.7" font-size="11" font-weight="700" fill="#111" text-anchor="end" font-family='${FONT}'>${esc(s.name)}</text>`;
+  }
+
+  function sheetsSvg(people, date, blank, paper) {
+    if (paper === 'a6') {
+      const x = ((A6_W - 284) / 2).toFixed(2);
+      const y = ((A6_H - 399) / 2).toFixed(2);
+      return people.map((s) => `<svg class="sheet a6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${A6_W} ${A6_H}" preserveAspectRatio="xMidYMin meet">`
+        + `<rect width="${A6_W}" height="${A6_H}" fill="#fff"/><g transform="translate(${x},${y})">${cardSvg(s, date)}</g></svg>`).join('');
+    }
+    return C.toSheets(people, 4).map((page) => {
+      const cards = page.map((s, i) => (s || blank ? `<g transform="translate(${SLOTS[i][0]},${SLOTS[i][1]})">${cardSvg(s, date)}</g>` : '')).join('');
+      const cut = 'stroke="#b0b0b0" stroke-width="0.75" stroke-dasharray="2.25 1.5"';
+      return `<svg class="sheet" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SHEET_W} ${SHEET_H}" preserveAspectRatio="xMidYMin meet">`
+        + `<rect width="${SHEET_W}" height="${SHEET_H}" fill="#fff"/>${cards}`
+        + `<line x1="298.09" y1="0" x2="298.09" y2="${SHEET_H}" ${cut}/><line x1="0" y1="421.09" x2="${SHEET_W}" y2="421.09" ${cut}/></svg>`;
+    }).join('');
+  }
+
+  function renderPrint() {
+    const P = S.print;
+    if (!P.date) P.date = today();
+    $('print-date').value = P.date;
+    $('print-blank').checked = P.blank;
+    const paper = PAPERS[P.paper];
+    document.querySelectorAll('#print-paper button').forEach((b) => b.classList.toggle('on', b.dataset.paper === P.paper));
+    $('print-blank-row').classList.toggle('hidden', P.paper !== 'a4');
+    $('print-page-style').textContent = `@page { size: ${paper.size}; margin: 0; } @media print { .print-sheets svg.sheet { width: ${paper.w}; height: ${paper.h}; } }`;
+    const { base, extra, picked } = printPeople();
+    const noDays = !S.roster.some((s) => s.status !== '퇴원' && s.days);
+    const wd = C.weekday(P.date);
+    $('print-info').innerHTML = noDays
+      ? '<span style="color:var(--warn)">명단에 등원 요일이 없습니다. <b>명단</b> 탭에서 [결제일 관리에서 불러오기]를 한 번 해 주세요.</span>'
+      : `${esc(wd)}요일 등원 ${base.length}명${extra.length ? ` + 추가 ${extra.length}명` : ''} · 인쇄 ${picked.length}장 (${paper.label} ${Math.ceil(picked.length / paper.per)}쪽)`;
+    const row = (s, checked, kind) => `<label class="check"><input type="checkbox" data-print="${kind}" data-no="${esc(s.no)}" ${checked ? 'checked' : ''}>
+      ${esc(s.no)} <b>${esc(s.name)}</b> <span class="muted">${esc([s.grade, s.days].filter(Boolean).join(' · '))}</span></label>`;
+    $('print-list').innerHTML = base.map((s) => row(s, P.off.indexOf(s.no) < 0, 'base')).join('')
+      + extra.map((s) => row(s, true, 'extra')).join('')
+      || (noDays ? '' : `<p class="muted">${esc(wd)}요일에 오는 학생이 없습니다.</p>`);
+    const shown = new Set([...base, ...extra].map((s) => s.no));
+    const others = S.roster.filter((s) => s.status !== '퇴원' && !shown.has(s.no)).sort((a, b) => a.no.localeCompare(b.no));
+    $('print-add').innerHTML = '<option value="">＋ 다른 학생 추가 (보강·대체 등)</option>'
+      + others.map((s) => `<option value="${esc(s.no)}">${esc(s.no)} ${esc(s.name)}${s.days ? ` (${esc(s.days)})` : ''}</option>`).join('');
+    $('print-add').disabled = !others.length;
+    $('print-go').disabled = !picked.length;
+    $('print-sheets').classList.toggle('a6', P.paper === 'a6');
+    $('print-sheets').innerHTML = sheetsSvg(picked, P.date, P.blank, P.paper);
+  }
+
+  function setPrintDate(d) {
+    if (!d) return;
+    Object.assign(S.print, { date: d, off: [], extra: [] });
+    renderPrint();
+  }
+  $('print-date').addEventListener('change', (e) => setPrintDate(e.target.value));
+  $('print-prev').addEventListener('click', () => setPrintDate(C.addDays(S.print.date || today(), -1)));
+  $('print-next').addEventListener('click', () => setPrintDate(C.addDays(S.print.date || today(), 1)));
+  $('print-blank').addEventListener('change', (e) => {
+    S.print.blank = e.target.checked;
+    store.set('print-blank', e.target.checked ? '1' : '0');
+    renderPrint();
+  });
+  $('print-paper').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-paper]');
+    if (!b) return;
+    S.print.paper = b.dataset.paper;
+    store.set('print-paper', S.print.paper);
+    renderPrint();
+  });
+  $('print-add').addEventListener('change', (e) => {
+    if (e.target.value) S.print.extra.push(e.target.value);
+    renderPrint();
+  });
+  $('print-list').addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t.dataset.print) return;
+    const P = S.print;
+    if (t.dataset.print === 'extra') P.extra = P.extra.filter((no) => no !== t.dataset.no);
+    else P.off = t.checked ? P.off.filter((no) => no !== t.dataset.no) : [...P.off, t.dataset.no];
+    renderPrint();
+  });
+
+  // 인쇄용 새 창(아이폰·아이패드에서도 카드만 찍히게). 창이 막히면 이 화면에서 바로 인쇄한다
+  $('print-go').addEventListener('click', () => {
+    const P = S.print;
+    const { picked } = printPeople();
+    if (!picked.length) return;
+    const title = `진도카드 ${P.date} (${C.weekday(P.date)}) ${picked.length}명`;
+    const paper = PAPERS[P.paper];
+    const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title><style>@page { size: ${paper.size}; margin: 0; } html, body { margin: 0; background: #fff; }
+svg.sheet { display: block; width: ${paper.w}; height: ${paper.h}; break-after: page; page-break-after: always; }
+svg.sheet:last-of-type { break-after: auto; page-break-after: auto; }
+@media screen { body { background: #888; } svg.sheet { margin: 12px auto; width: min(${paper.w}, 96vw); height: auto; } }</style></head><body>
+${$('pc-card-defs').outerHTML}${sheetsSvg(picked, P.date, P.blank, P.paper)}
+<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });<\/script></body></html>`;
+    let w = null;
+    try {
+      w = window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
+    } catch (e) {
+      w = null;
+    }
+    if (!w) window.print();
+  });
 
   /* ---------- 시작 ---------- */
   async function start() {
