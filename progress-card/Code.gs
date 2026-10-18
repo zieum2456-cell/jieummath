@@ -127,6 +127,25 @@ const RENAMED_COLS = {
   },
 };
 
+// 보기 이름만 바뀐 열: 열 이름 → { 옛 값: 새 값 } (2026-10-18 학습 단계 'Test' → '평가')
+const RENAMED_VALUES = {
+  단계: { Test: '평가' },
+};
+
+/** 저장된 옛 보기 이름을 새 이름으로 바꾼다 (바뀐 칸이 있을 때만 쓴다) */
+function renameValues_(sh, head) {
+  head.forEach((h, i) => {
+    const map = RENAMED_VALUES[h];
+    const rows = sh.getLastRow() - 1;
+    if (!map || rows < 1) return;
+    const range = sh.getRange(2, i + 1, rows, 1);
+    const values = range.getDisplayValues();
+    const old = (v) => String(v).split(';').some((t) => t.trim() in map);
+    if (!values.some(([v]) => old(v))) return;
+    range.setValues(values.map(([v]) => [old(v) ? String(v).split(';').map((t) => t.trim()).filter(Boolean).map((t) => map[t] || t).join('; ') : v]));
+  });
+}
+
 /** 옛 이름 열을 새 이름으로 바꾸고, 그 열에 저장된 값도 새 보기 이름으로 바꾼다 (한 번만 일어남) */
 function renameColumns_(sh, def, head) {
   head.forEach((h, i) => {
@@ -148,6 +167,7 @@ function ensureHeaders_(sh, def) {
   const n = sh.getLastColumn();
   const head = n ? sh.getRange(1, 1, 1, n).getDisplayValues()[0] : [];
   renameColumns_(sh, def, head);
+  renameValues_(sh, head);
   if (head.length >= def.headers.length || head.some((h, i) => h !== def.headers[i])) return;
   def.headers.slice(head.length).forEach((h, k) => {
     const col = head.length + k + 1;

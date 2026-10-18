@@ -212,12 +212,21 @@ for x in (in_x, out_x):
     att_text += '<path fill="#8c8c8c" d="M%.2f %.2fh%.2fv%.2fh-%.2fZ"/>' % (a, ULINE_Y, line_len, ULINE_H, line_len)
     att_text += text_path(':', a + (line_len - colon_w) / 2, 109.96, 'R', 6.882 / 0.92, 0)
 
+# 학습 단계 칸: 칸 이름과 'Test' 보기 글자만 바꾼다
+stage = next((a, b) for a, b in zip(dividers, dividers[1:]) if 143 < a < 144)
+stage_text = text_path('학습 단계', 17.54, 159.11, 'B', 6.996 / 0.92, 1.98) + text_path('평가', 222.03, 159.82, 'R', 6.882 / 0.92, 2.12)
+
 parts = {name: [] for name in OLD}
 body = ''
 for c in card:
     name = band_of(c)
     t = top_y(c)
-    if name is None and t is not None and att[0] + 0.1 < t <= att[1] + 0.1:
+    if name is None and c.tag == SVG + 'g' and t is not None and stage[0] + 0.1 < t <= stage[1] + 0.1:
+        x = float(c.find(SVG + 'use').get('x'))
+        if x < 55 or 215 < x < 243:
+            continue  # 옛 글자 '단계', 'Test'
+        body += emit(c)
+    elif name is None and t is not None and att[0] + 0.1 < t <= att[1] + 0.1:
         if c.tag == SVG + 'path' and not c.get('transform') and c.get('fill', '').startswith('rgb(54.'):
             continue  # 옛 밑줄
         if c.tag == SVG + 'path' and c.get('transform'):
@@ -244,7 +253,7 @@ for c in card:
     else:
         parts[name].append(emit(c))
 parts['mistake'].append(mistake_text)
-body += att_text + hw_text + ''.join('<g transform="translate(%.2f,0)">%s</g>' % (x - HW_X0, hw_bubble) for x in hw_x)
+body += stage_text + att_text + hw_text + ''.join('<g transform="translate(%.2f,0)">%s</g>' % (x - HW_X0, hw_bubble) for x in hw_x)
 for name in NEW:
     body += '<g transform="translate(0,%.2f)">%s</g>' % (shift[name], ''.join(parts[name]))
 

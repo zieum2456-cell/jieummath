@@ -200,8 +200,10 @@ test('수업기록: 옛 오답원인 열은 학습주안점으로 이름과 값�
   const col = headers.indexOf('오답원인') + 1;
   old.appendRow(['2026-10-01_56', '2026-10-01', '56']);
   old.getRange(2, col).setValue('개념 이해 부족; 계산 실수');
+  old.getRange(2, headers.indexOf('단계') + 1).setValue('Test; 개념');
   g.ctx.setup();
   const rec = g.ss.getSheetByName('수업기록').objects();
+  assert.equal(rec[0].단계, '평가; 개념');
   assert.equal(rec[0].학습주안점, '개념 재학습/오개념 수정; 계산 실수 교정');
   assert.equal(rec[0].오답원인, undefined);
   g.ctx.setup(); // 두 번 실행해도 그대로

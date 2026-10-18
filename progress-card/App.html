@@ -412,7 +412,7 @@
     { f: '출결', type: 'seg' },
     { f: '시간', type: 'time' },
     { f: '지난과제', type: 'seg' },
-    { f: '단계', type: 'multi' },
+    { f: '단계', label: '학습 단계', type: 'multi' },
     { f: '진행률', type: 'seg' },
     { f: '학습주안점', type: 'multi' },
     { f: '추가포인트', type: 'seg' },
@@ -486,13 +486,13 @@
     html += '<div id="card-issues"></div>';
     if (ex) {
       html += `<div class="dup-box"><b>이미 저장된 기록이 있습니다</b> <span class="muted">(${esc(ex.저장일시)} 저장${ex.수정일시 ? ', ' + esc(ex.수정일시) + ' 수정' : ''})</span>
-        <dl><dt>출결</dt><dd>${esc(ex.출결)} ${esc(ex.등원)}~${esc(ex.하원)}</dd><dt>단계</dt><dd>${esc(ex.단계)} · ${esc(ex.진행률)}</dd>
+        <dl><dt>출결</dt><dd>${esc(ex.출결)} ${esc(ex.등원)}~${esc(ex.하원)}</dd><dt>학습 단계</dt><dd>${esc(ex.단계)} · ${esc(ex.진행률)}</dd>
         <dt>오늘진도</dt><dd>${esc(ex.오늘진도범위)}</dd><dt>오늘과제</dt><dd>${esc(ex.오늘과제)}</dd><dt>학습태도</dt><dd>${esc(ex.학습태도)}</dd></dl>
         <div class="seg"><button type="button" data-act="dup" data-val="skip" class="${c.dupChoice === 'skip' ? 'on' : ''}">건너뛰기 (기존 기록 유지)</button>
         <button type="button" data-act="dup" data-val="overwrite" class="${c.dupChoice === 'overwrite' ? 'on' : ''}">덮어쓰기</button></div></div>`;
     }
     html += `<div class="fields">${FIELDS.map((d) => `<div class="fld ${d.wide || d.type === 'range' || d.type === 'multi' ? 'wide' : ''}" data-field="${d.f}">
-        <div class="flabel">${d.f === '시간' ? '등원 · 하원 · 수업시간' : d.f}<span class="edited">· 수정됨</span>
+        <div class="flabel">${d.f === '시간' ? '등원 · 하원 · 수업시간' : d.label || d.f}<span class="edited">· 수정됨</span>
         <button type="button" class="revert" data-revert="${d.f}">원래 값</button></div>
         ${control(d, v)}<div class="fmsg"></div></div>`).join('')}</div>`;
     html += `<div class="card-nav"><button class="btn" data-act="prev" ${idx <= 0 ? 'disabled' : ''}>← 이전 카드</button>
@@ -1060,7 +1060,7 @@
       <div class="stat"><div class="k">평균 수업시간</div><div class="v">${st.avgMinutes == null ? '-' : st.avgMinutes + '분'}</div><div class="s">결강 제외</div></div>
     </div>
     <h3>학습 주안점</h3><div class="chips">${st.errors.length ? st.errors.map(([t, n]) => `<span class="chip">${esc(t)} <b>${n}</b></span>`).join('') : '<span class="muted">없음</span>'}</div>
-    <h3>단계 변화</h3>${st.stages.length ? `<ol class="stages">${st.stages.map((x) => `<li>${md(x.date)}부터 <b>${esc(x.stage)}</b> <span class="muted">${x.count}회</span></li>`).join('')}</ol>` : '<span class="muted">없음</span>'}`;
+    <h3>학습 단계 변화</h3>${st.stages.length ? `<ol class="stages">${st.stages.map((x) => `<li>${md(x.date)}부터 <b>${esc(x.stage)}</b> <span class="muted">${x.count}회</span></li>`).join('')}</ol>` : '<span class="muted">없음</span>'}`;
   }
 
   /** 수업 기록 한 장 (타임라인·날짜별 공용). who: 학생 이름을 머리에 보여 줄지 */
@@ -1079,7 +1079,7 @@
         <span class="muted">${time}</span>${Number(r.추가포인트) ? ` <span class="badge ok">+${esc(r.추가포인트)}점</span>` : ''}
         ${r.확인필요상태 === '해결' ? '<span class="badge rv" title="판독 확인필요 항목을 확인함">판독 확인</span>' : ''}</div>
       <div class="entry-grid">
-        ${row('단계', [C.splitList(r.단계).join('·'), r.진행률].filter(Boolean).map(esc).join(' · '))}
+        ${row('학습 단계', [C.splitList(r.단계).join('·'), r.진행률].filter(Boolean).map(esc).join(' · '))}
         ${row('지난 과제', hw)}
         ${row('오늘 진도', chips(r.오늘진도범위))}
         ${row('추가 포인트', chips(r.추가포인트범위))}
