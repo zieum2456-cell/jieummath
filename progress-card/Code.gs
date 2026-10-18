@@ -9,7 +9,7 @@
 const TZ = 'Asia/Seoul';
 
 // Core.html 의 HEADERS 와 같아야 한다 (CSV 열 순서)
-const CSV_HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '오답원인', '추가포인트',
+const CSV_HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '학습주안점', '추가포인트',
   '지난과제범위', '오늘진도범위', '추가포인트범위', '오늘과제', '학습태도', '확인필요'];
 
 const SHEETS = {
@@ -41,11 +41,11 @@ const SHEETS = {
 };
 
 const DEFAULT_SETTINGS = [
-  ['두고옴처리', '안 함과 같이(×0)', '과제 완료율 계산 때 "두고 옴"을 어떻게 셀지: 안 함과 같이(×0) / 미완과 같이(×0.5) / 계산에서 제외'],
+  ['두고옴처리', '안 함과 같이(×0)', '과제 완료율 계산 때 "두고 옴"을 어떻게 셀지: 안 함과 같이(×0) / 절반만 인정(×0.5) / 계산에서 제외'],
   ['원본폴더ID', '', '업로드한 원본 CSV를 보관하는 구글 드라이브 폴더 (처음 설정 때 자동으로 채워짐)'],
   ['파이어베이스프로젝트ID', 'jieummath', '결제일 관리 앱이 쓰는 Firebase 프로젝트 ID (명단 자동 불러오기에 사용)'],
 ];
-const DONE_OPTIONS = ['안 함과 같이(×0)', '미완과 같이(×0.5)', '계산에서 제외'];
+const DONE_OPTIONS = ['안 함과 같이(×0)', '절반만 인정(×0.5)', '계산에서 제외'];
 const PENDING = ['확인 대기', '일부 저장'];
 const ROOT_FOLDER_NAME = '진도카드 원본';
 const EXPORT_FOLDER_NAME = '진도카드 내보내기';
@@ -119,10 +119,55 @@ function ensureSheets_(ss) {
   });
 }
 
+// 이름이 바뀐 열: 옛 이름 → { 새 이름, 값 바꾸기 } (2026-10-18 카드 양식 변경: 오답원인 → 학습주안점)
+const RENAMED_COLS = {
+  오답원인: {
+    to: '학습주안점',
+    values: { '개념 이해 부족': '개념 재학습/오개념 수정', '조건 놓침': '문제 읽기(조건 찾기)', '계산 실수': '계산 실수 교정', '풀이 과정 생략': '풀이 과정 서술' },
+  },
+};
+
+// 보기 이름만 바뀐 열: 열 이름 → { 옛 값: 새 값 } (2026-10-18 학습 단계 'Test' → '평가')
+const RENAMED_VALUES = {
+  단계: { Test: '평가' },
+};
+
+/** 저장된 옛 보기 이름을 새 이름으로 바꾼다 (바뀐 칸이 있을 때만 쓴다) */
+function renameValues_(sh, head) {
+  head.forEach((h, i) => {
+    const map = RENAMED_VALUES[h];
+    const rows = sh.getLastRow() - 1;
+    if (!map || rows < 1) return;
+    const range = sh.getRange(2, i + 1, rows, 1);
+    const values = range.getDisplayValues();
+    const old = (v) => String(v).split(';').some((t) => t.trim() in map);
+    if (!values.some(([v]) => old(v))) return;
+    range.setValues(values.map(([v]) => [old(v) ? String(v).split(';').map((t) => t.trim()).filter(Boolean).map((t) => map[t] || t).join('; ') : v]));
+  });
+}
+
+/** 옛 이름 열을 새 이름으로 바꾸고, 그 열에 저장된 값도 새 보기 이름으로 바꾼다 (한 번만 일어남) */
+function renameColumns_(sh, def, head) {
+  head.forEach((h, i) => {
+    const r = RENAMED_COLS[h];
+    if (!r || def.headers.indexOf(r.to) !== i || head.indexOf(r.to) >= 0) return;
+    sh.getRange(1, i + 1).setValue(r.to);
+    head[i] = r.to;
+    const rows = sh.getLastRow() - 1;
+    if (rows < 1) return;
+    const range = sh.getRange(2, i + 1, rows, 1);
+    range.setValues(range.getDisplayValues().map(([v]) => [
+      String(v).split(';').map((t) => t.trim()).filter(Boolean).map((t) => r.values[t] || t).join('; '),
+    ]));
+  });
+}
+
 /** 이미 쓰던 탭에 나중에 생긴 열(맨 뒤)이 없으면 붙인다. 기존 열 순서가 다르면 건드리지 않는다 */
 function ensureHeaders_(sh, def) {
   const n = sh.getLastColumn();
   const head = n ? sh.getRange(1, 1, 1, n).getDisplayValues()[0] : [];
+  renameColumns_(sh, def, head);
+  renameValues_(sh, head);
   if (head.length >= def.headers.length || head.some((h, i) => h !== def.headers[i])) return;
   def.headers.slice(head.length).forEach((h, k) => {
     const col = head.length + k + 1;
@@ -203,6 +248,8 @@ function settings_() {
   readObjects_('settings').forEach((r) => {
     if (r.항목) out[r.항목] = r.값;
   });
+  // 지난과제 '미완'이 없어지면서 바뀐 이름 (2026-10-18)
+  if (out.두고옴처리 === '미완과 같이(×0.5)') out.두고옴처리 = '절반만 인정(×0.5)';
   return out;
 }
 
@@ -587,6 +634,31 @@ function api_changeNo(c) {
     const note = `${time.slice(0, 10)} ${from}번에서 ${to}번으로 변경(기록 ${mine.length}건)`;
     Object.assign(me, { 학생번호: to, 메모: [me.메모, note].filter(Boolean).join(' / '), 수정일시: time });
     writeObject_('roster', me._row, me);
+    out.roster = rosterList_();
+    return out;
+  });
+}
+
+/**
+ * 명단에서 학생 한 명 지우기
+ * c: { no, dryRun, withRecords } → { name, count: 그 학생의 수업기록 수, deleted: 지운 수업기록 수, roster }
+ *  - withRecords 가 참이면 그 학생의 수업기록도 함께 지우고, 아니면 수업기록은 그대로 둔다
+ */
+function api_deleteStudent(c) {
+  return withLock_(() => {
+    const no = String(c.no || '');
+    const r = readObjects_('roster').find((x) => x.학생번호 === no);
+    if (!r) throw new Error(`명단에 ${no}번 학생이 없습니다.`);
+    const mine = readObjects_('records').filter((x) => x.학생번호 === no);
+    const out = { name: r.이름, count: mine.length, deleted: 0 };
+    if (c.dryRun) return out;
+    if (c.withRecords) {
+      // 아래 행부터 지워야 위쪽 행 번호가 밀리지 않는다
+      const sh = sheet_('records');
+      mine.map((x) => x._row).sort((a, b) => b - a).forEach((row) => sh.deleteRow(row));
+      out.deleted = mine.length;
+    }
+    sheet_('roster').deleteRow(r._row);
     out.roster = rosterList_();
     return out;
   });

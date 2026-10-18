@@ -171,6 +171,45 @@ test('명단: 등원요일 열이 없던 시트에는 열을 붙인다', () => {
   assert.equal(sh.getLastColumn(), 9);
 });
 
+test('명단: 학생 삭제는 명단 줄만 지우고 수업기록은 남긴다', () => {
+  const g = fresh();
+  g.ctx.api_applyRoster({ add: [{ no: '56', name: '김도윤', grade: '초4' }, { no: '43', name: '이지아', grade: '초5' }, { no: '73', name: '박채아' }], update: [], retire: [] });
+  register(g);
+  g.ctx.api_save({ cards: pendingCards(g), skips: [] });
+  const plan = plain(g.ctx.api_deleteStudent({ no: '43', dryRun: true }));
+  assert.deepEqual([plan.name, plan.count], ['이지아', 1]);
+  assert.equal(g.ss.getSheetByName('학생명단').objects().length, 3); // 미리 보기는 지우지 않음
+  const r = plain(g.ctx.api_deleteStudent({ no: '43' }));
+  assert.deepEqual(r.roster.map((s) => [s.no, s.name]), [['56', '김도윤'], ['73', '박채아']]);
+  assert.equal(g.ss.getSheetByName('수업기록').objects().filter((x) => x.학생번호 === '43').length, 1);
+  assert.throws(() => g.ctx.api_deleteStudent({ no: '43' }), /명단에 43번 학생이 없습니다/);
+  // 수업기록까지 함께 지우기: 그 학생 기록만 빠지고 다른 학생 기록은 그대로
+  const before = g.ss.getSheetByName('수업기록').objects().length;
+  const r2 = plain(g.ctx.api_deleteStudent({ no: '56', withRecords: true }));
+  assert.equal(r2.deleted, 1);
+  const rec = g.ss.getSheetByName('수업기록').objects();
+  assert.equal(rec.length, before - 1);
+  assert.deepEqual(rec.map((x) => x.학생번호), ['43', '73']);
+});
+
+test('수업기록: 옛 오답원인 열은 학습주안점으로 이름과 값을 바꾼다', () => {
+  const g = loadGas();
+  const old = g.ss.insertSheet('수업기록');
+  const headers = ['기록ID'].concat(C.HEADERS.map((h) => (h === '학습주안점' ? '오답원인' : h)));
+  old.appendRow(headers);
+  const col = headers.indexOf('오답원인') + 1;
+  old.appendRow(['2026-10-01_56', '2026-10-01', '56']);
+  old.getRange(2, col).setValue('개념 이해 부족; 계산 실수');
+  old.getRange(2, headers.indexOf('단계') + 1).setValue('Test; 개념');
+  g.ctx.setup();
+  const rec = g.ss.getSheetByName('수업기록').objects();
+  assert.equal(rec[0].단계, '평가; 개념');
+  assert.equal(rec[0].학습주안점, '개념 재학습/오개념 수정; 계산 실수 교정');
+  assert.equal(rec[0].오답원인, undefined);
+  g.ctx.setup(); // 두 번 실행해도 그대로
+  assert.equal(g.ss.getSheetByName('수업기록').objects()[0].학습주안점, '개념 재학습/오개념 수정; 계산 실수 교정');
+});
+
 test('명단: Firebase 읽기 실패 시 이유를 알려 준다', () => {
   const g = fresh({ firestoreStatus: 403 });
   assert.throws(() => g.ctx.api_fetchPaymentRoster(), /403 \/ 403.*Permission denied/);

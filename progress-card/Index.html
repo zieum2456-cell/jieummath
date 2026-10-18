@@ -88,7 +88,7 @@
     </div>
     <div class="card">
       <div class="table-wrap"><table class="sum-table">
-        <thead><tr><th>번호</th><th>이름</th><th>레벨·조</th><th>수업<br><span class="muted">정규·보강·결강</span></th><th>과제<br>완료율</th><th>포인트</th><th>평균<br>시간</th><th>오답 원인</th><th>최근 단계</th></tr></thead>
+        <thead><tr><th>번호</th><th>이름</th><th>레벨·조</th><th>수업<br><span class="muted">정규·보강·결강</span></th><th>과제<br>완료율</th><th>포인트</th><th>평균<br>시간</th><th>학습 주안점</th><th>최근 학습 단계</th></tr></thead>
         <tbody id="sum-body"></tbody>
       </table></div>
       <p class="muted">줄을 누르면 그 학생의 타임라인으로 갑니다.</p>
@@ -126,7 +126,7 @@
       <div class="row" style="margin-top:12px">
         <button class="btn primary" id="print-go">인쇄</button>
       </div>
-      <p class="muted">카드마다 학생번호 칸이 미리 칠해지고, 위쪽에 날짜와 이름이 찍힙니다. 인쇄 창에서 <b>고른 용지(A4 또는 A6) · 배율 100%(실제 크기)</b>로 맞춰 주세요.</p>
+      <p class="muted">카드마다 학생번호 칸이 미리 칠해지고, 위쪽에 날짜·다음 등원일과 이름이 찍힙니다. 인쇄 창에서 <b>고른 용지(A4 또는 A6) · 배율 100%(실제 크기)</b>로 맞춰 주세요.</p>
     </div>
     <div id="print-sheets" class="print-sheets"></div>
   </section>
@@ -167,7 +167,7 @@
       <label class="stack">"두고 옴"은
         <select id="set-done"></select>
       </label>
-      <p class="muted">완료율 = (완료 + 미완×0.5) ÷ (과제 없음을 뺀 횟수)</p>
+      <p class="muted">완료율 = (완료 + 50% 이상×0.7 + 50% 미만×0.3) ÷ (과제 없음을 뺀 횟수)</p>
     </div>
     <div class="card">
       <h2>결제일 관리 연결</h2>

@@ -22,6 +22,21 @@ test('샘플 CSV: 제목 줄 통과, 카드 3장, 학생번호 문자열 유지'
   assert.deepEqual(r.cards.map((c) => c.rowNo), [2, 3, 4]);
 });
 
+test('옛 양식 CSV(오답원인 열)는 학습주안점과 새 보기 이름으로 읽는다', () => {
+  const r = sample(); // 샘플은 옛 양식
+  assert.deepEqual(r.cards.map((c) => c.values.학습주안점), ['계산 실수 교정', '문제 읽기(조건 찾기)', '개념 재학습/오개념 수정; 문제 읽기(조건 찾기)']);
+  assert.deepEqual(r.cards.flatMap((c) => issuesOf(c)).filter((x) => x.field === '학습주안점'), []);
+  const fresh = C.readCsv('b.csv', C.HEADERS.join(',') + '\n' + C.HEADERS.map((h) => (h === '학습주안점' ? '"풀이 과정 서술; 계산 실수 교정"' : '')).join(','));
+  assert.deepEqual(fresh.headerErrors, []);
+  assert.equal(fresh.cards[0].values.학습주안점, '풀이 과정 서술; 계산 실수 교정');
+});
+
+test('지난과제: 새 보기(50% 이상/미만)와 옛 카드의 미완은 통과, 없는 값은 오류', () => {
+  const csv = (x) => C.readCsv('c.csv', C.HEADERS.join(',') + '\n' + C.HEADERS.map((h) => (h === '지난과제' ? x : '')).join(','));
+  ['50% 이상', '50% 미만', '미완'].forEach((x) => assert.deepEqual(issuesOf(csv(x).cards[0]).filter((i) => i.field === '지난과제'), []));
+  assert.equal(issuesOf(csv('반쯤').cards[0]).filter((i) => i.field === '지난과제').length, 1);
+});
+
 test('샘플 CSV: 도윤 카드가 맨 위(확인필요), 나머지 문제없음', () => {
   const r = sample();
   const ranked = r.cards.map((c) => ({ c, rank: C.rankOf(c.values, issuesOf(c)) }));
@@ -60,7 +75,7 @@ test('열 이름·순서 오류는 몇 번째 열인지 알려 준다', () => {
 
 const base = () => ({
   수업일: '2026-10-09', 학생번호: '56', 이름: '도윤', 출결: '정규', 등원: '16:00', 하원: '17:30', '수업시간(분)': '90',
-  지난과제: '완료', 단계: '개념; 유형', 진행률: '50~75%', 오답원인: '', 추가포인트: '3',
+  지난과제: '완료', 단계: '개념; 유형', 진행률: '50~75%', 학습주안점: '', 추가포인트: '3',
   지난과제범위: '디딤돌[1~2]○', 오늘진도범위: '', 추가포인트범위: '', 오늘과제: '', 학습태도: '', 확인필요: '',
 });
 const v = (patch, ctx) => C.validateCard({ ...base(), ...patch }, { roster: ROSTER, ...ctx });
@@ -119,6 +134,7 @@ test('이름 비교: 성을 뺀 이름도 같은 사람', () => {
 
 test('저장용 정리: 여러 개 칸 구분자 통일', () => {
   assert.equal(C.canonical({ ...base(), 단계: '개념;유형 ;' }).단계, '개념; 유형');
+  assert.equal(C.canonical({ ...base(), 단계: 'Test; 경시' }).단계, '평가; 경시');
 });
 
 test('명단 붙여넣기 해석과 비교', () => {
@@ -157,6 +173,10 @@ test('카드 인쇄: 그 날짜 요일 등원생, 4장씩 나누기', () => {
   assert.deepEqual(C.studentsOn(roster, ''), []);
   assert.deepEqual(C.toSheets([1, 2, 3, 4, 5], 4), [[1, 2, 3, 4], [5, null, null, null]]);
   assert.deepEqual(C.toSheets([], 4), []);
+  assert.equal(C.nextClassDate('화목', '2026-10-20'), '2026-10-22'); // 화 → 목
+  assert.equal(C.nextClassDate('화목', '2026-10-22'), '2026-10-27'); // 목 → 다음 주 화
+  assert.equal(C.nextClassDate('화', '2026-10-20'), '2026-10-27'); // 주 1회 → 일주일 뒤
+  assert.equal(C.nextClassDate('', '2026-10-20'), '');
 });
 
 /* ---------- 2단계: 기간 · 집계 ---------- */
@@ -172,31 +192,34 @@ test('기간 단추', () => {
   assert.equal(C.weekday('2026-10-09'), '금');
 });
 
-test('과제 완료율: (완료 + 미완×0.5) / 과제 없음을 뺀 횟수, 두고 옴은 설정대로', () => {
-  const rs = ['완료', '완료', '미완', '안 함', '두고 옴', '과제 없음', ''].map((x, i) => rec(`2026-10-0${i + 1}`, { 지난과제: x }));
+test('과제 완료율: (완료 + 50% 이상×0.7 + 50% 미만×0.3) / 과제 없음을 뺀 횟수, 두고 옴은 설정대로', () => {
+  const rs = ['완료', '50% 이상', '50% 미만', '안 함', '두고 옴', '과제 없음', ''].map((x, i) => rec(`2026-10-0${i + 1}`, { 지난과제: x }));
   const zero = C.homework(rs, '안 함과 같이(×0)');
   assert.equal(zero.denom, 5);
-  assert.equal(zero.rate, 2.5 / 5);
-  assert.equal(C.homework(rs, '미완과 같이(×0.5)').rate, 3 / 5);
+  assert.ok(Math.abs(zero.rate - 2 / 5) < 1e-9);
+  assert.ok(Math.abs(C.homework(rs, '절반만 인정(×0.5)').rate - 2.5 / 5) < 1e-9);
+  assert.ok(Math.abs(C.homework(rs, '미완과 같이(×0.5)').rate - 2.5 / 5) < 1e-9);
   const ex = C.homework(rs, '계산에서 제외');
   assert.equal(ex.denom, 4);
-  assert.equal(ex.rate, 2.5 / 4);
+  assert.ok(Math.abs(ex.rate - 2 / 4) < 1e-9);
+  // 옛 기록의 미완은 ×0.5
+  assert.equal(C.homework([rec('2026-10-01', { 지난과제: '미완' }), rec('2026-10-02', { 지난과제: '완료' })], '').rate, 1.5 / 2);
   assert.equal(C.homework([rec('2026-10-01', { 지난과제: '과제 없음' })], '').rate, null);
 });
 
 test('학생 기간 집계', () => {
   const rs = [
-    rec('2026-10-06', { 출결: '정규', 단계: '개념', 오답원인: '계산 실수', 추가포인트: '3', '수업시간(분)': '90' }),
-    rec('2026-10-01', { 출결: '정규', 단계: '개념', 오답원인: '계산 실수; 조건 놓침', 추가포인트: '0', '수업시간(분)': '80' }),
-    rec('2026-10-08', { 출결: '결강', 단계: '', 오답원인: '', 추가포인트: '', '수업시간(분)': '', 지난과제: '' }),
-    rec('2026-10-09', { 출결: '보강', 단계: '유형; 개념', 오답원인: '', 추가포인트: '9', '수업시간(분)': '55' }),
+    rec('2026-10-06', { 출결: '정규', 단계: '개념', 학습주안점: '계산 실수 교정', 추가포인트: '3', '수업시간(분)': '90' }),
+    rec('2026-10-01', { 출결: '정규', 단계: '개념', 학습주안점: '계산 실수; 조건 놓침', 추가포인트: '0', '수업시간(분)': '80' }),
+    rec('2026-10-08', { 출결: '결강', 단계: '', 학습주안점: '', 추가포인트: '', '수업시간(분)': '', 지난과제: '' }),
+    rec('2026-10-09', { 출결: '보강', 단계: '유형; 개념', 학습주안점: '', 추가포인트: '9', '수업시간(분)': '55' }),
   ];
   const s = C.summarize(rs, { leftMode: '안 함과 같이(×0)' });
   assert.equal(s.count, 4);
   assert.deepEqual(s.attendance, { 정규: 2, 보강: 1, 결강: 1 });
   assert.equal(s.points, 12);
   assert.equal(s.avgMinutes, 75);
-  assert.deepEqual(s.errors, [['계산 실수', 2], ['조건 놓침', 1]]);
+  assert.deepEqual(s.errors, [['계산 실수 교정', 2], ['문제 읽기(조건 찾기)', 1]]); // 옛 보기 이름도 새 이름으로 센다
   assert.deepEqual(s.stages, [{ date: '2026-10-01', stage: '개념', count: 2 }, { date: '2026-10-09', stage: '개념·유형', count: 1 }]);
   assert.equal(s.from, '2026-10-01');
   assert.equal(s.homework.denom, 3);

@@ -412,9 +412,9 @@
     { f: '출결', type: 'seg' },
     { f: '시간', type: 'time' },
     { f: '지난과제', type: 'seg' },
-    { f: '단계', type: 'multi' },
+    { f: '단계', label: '학습 단계', type: 'multi' },
     { f: '진행률', type: 'seg' },
-    { f: '오답원인', type: 'multi' },
+    { f: '학습주안점', type: 'multi' },
     { f: '추가포인트', type: 'seg' },
     { f: '지난과제범위', type: 'range' },
     { f: '오늘진도범위', type: 'range' },
@@ -486,13 +486,13 @@
     html += '<div id="card-issues"></div>';
     if (ex) {
       html += `<div class="dup-box"><b>이미 저장된 기록이 있습니다</b> <span class="muted">(${esc(ex.저장일시)} 저장${ex.수정일시 ? ', ' + esc(ex.수정일시) + ' 수정' : ''})</span>
-        <dl><dt>출결</dt><dd>${esc(ex.출결)} ${esc(ex.등원)}~${esc(ex.하원)}</dd><dt>단계</dt><dd>${esc(ex.단계)} · ${esc(ex.진행률)}</dd>
+        <dl><dt>출결</dt><dd>${esc(ex.출결)} ${esc(ex.등원)}~${esc(ex.하원)}</dd><dt>학습 단계</dt><dd>${esc(ex.단계)} · ${esc(ex.진행률)}</dd>
         <dt>오늘진도</dt><dd>${esc(ex.오늘진도범위)}</dd><dt>오늘과제</dt><dd>${esc(ex.오늘과제)}</dd><dt>학습태도</dt><dd>${esc(ex.학습태도)}</dd></dl>
         <div class="seg"><button type="button" data-act="dup" data-val="skip" class="${c.dupChoice === 'skip' ? 'on' : ''}">건너뛰기 (기존 기록 유지)</button>
         <button type="button" data-act="dup" data-val="overwrite" class="${c.dupChoice === 'overwrite' ? 'on' : ''}">덮어쓰기</button></div></div>`;
     }
     html += `<div class="fields">${FIELDS.map((d) => `<div class="fld ${d.wide || d.type === 'range' || d.type === 'multi' ? 'wide' : ''}" data-field="${d.f}">
-        <div class="flabel">${d.f === '시간' ? '등원 · 하원 · 수업시간' : d.f}<span class="edited">· 수정됨</span>
+        <div class="flabel">${d.f === '시간' ? '등원 · 하원 · 수업시간' : d.label || d.f}<span class="edited">· 수정됨</span>
         <button type="button" class="revert" data-revert="${d.f}">원래 값</button></div>
         ${control(d, v)}<div class="fmsg"></div></div>`).join('')}</div>`;
     html += `<div class="card-nav"><button class="btn" data-act="prev" ${idx <= 0 ? 'disabled' : ''}>← 이전 카드</button>
@@ -751,7 +751,15 @@
       if (S.editNo === s.no) return editRow(s, false);
       return `<tr class="${s.status === '퇴원' ? 'muted' : ''}"><td>${esc(s.no)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.grade)}</td><td>${esc(s.days)}</td>
           <td>${esc(s.level)}</td><td>${esc(s.group)}</td><td>${esc(s.status)}</td><td class="muted">${esc(s.memo)}</td>
-          <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button></td></tr>`
+          <td><button class="btn small" data-edit="${esc(s.no)}">수정</button> <button class="btn small" data-chno="${esc(s.no)}">번호 변경</button> <button class="btn small danger" data-del="${esc(s.no)}">삭제</button></td></tr>`
+          + (S.del && S.del.no === s.no ? `<tr><td colspan="9" style="white-space:normal"><div class="notice warn" style="margin:0">
+            <b>${esc(s.no)}번 ${esc(s.name)} 학생을 명단에서 삭제할까요?</b>
+            <div class="muted">결제일 관리 앱에 이 학생이 남아 있으면 다음 불러오기 때 다시 "추가"로 나옵니다. 그만둔 학생이라면 삭제 대신 [수정]에서 상태를 퇴원으로 바꿀 수도 있습니다.</div>
+            <div class="row" style="margin-top:8px">${S.del.count
+              ? `<button class="btn small" data-del-go="keep">학생만 삭제 (수업기록 ${S.del.count}건 남김)</button>
+                 <button class="btn small danger" data-del-go="all">수업기록 ${S.del.count}건도 함께 삭제</button>`
+              : '<button class="btn small danger" data-del-go="keep">삭제</button>'}
+            <button class="btn small" data-del-go="cancel">취소</button></div></div></td></tr>` : '')
           + (S.chNo === s.no ? `<tr><td colspan="9"><div class="row">
             <span>${esc(s.no)}번 ${esc(s.name)} → 새 번호</span>
             <input id="chno-input" inputmode="numeric" maxlength="2" style="width:80px" autocomplete="off">
@@ -779,8 +787,10 @@
   });
 
   $('roster-body').addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-chno],[data-edit],[data-edit-save],[data-edit-cancel]');
+    const b = e.target.closest('[data-chno],[data-edit],[data-edit-save],[data-edit-cancel],[data-del],[data-del-go]');
     if (!b) return;
+    if (b.dataset.del) return askDelete(b.dataset.del);
+    if (b.dataset.delGo) return deleteStudent(b.dataset.delGo);
     if (b.dataset.chno) {
       S.chNo = S.chNo === b.dataset.chno ? null : b.dataset.chno;
       S.editNo = null;
@@ -815,6 +825,47 @@
       idle();
     }
   });
+
+  // 학생 삭제: 수업기록이 몇 건인지 먼저 확인하고, 기록을 남길지 함께 지울지 고르게 한다
+  async function askDelete(no) {
+    if (S.del && S.del.no === no) {
+      S.del = null;
+      return renderRoster();
+    }
+    busy('확인 중…');
+    try {
+      const plan = await run('api_deleteStudent', { no, dryRun: true });
+      S.del = { no, name: plan.name, count: plan.count };
+      S.editNo = null;
+      S.chNo = null;
+      renderRoster();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      idle();
+    }
+  }
+
+  async function deleteStudent(mode) {
+    const d = S.del;
+    S.del = null;
+    if (!d || mode === 'cancel') return renderRoster();
+    const all = mode === 'all';
+    if (all && !confirm(`${d.no}번 ${d.name} 학생의 수업기록 ${d.count}건을 시트에서 지웁니다. 지운 기록은 되돌릴 수 없습니다. 계속할까요?`)) return renderRoster();
+    busy('삭제 중…');
+    try {
+      const r = await run('api_deleteStudent', { no: d.no, withRecords: all });
+      S.roster = r.roster;
+      if (all) S.records = null; // 지운 기록이 학생·날짜·집계 탭에 남지 않게 다음에 다시 읽는다
+      revalidate();
+      renderRoster();
+      toast(`${d.no}번 ${d.name} 학생을 삭제했습니다.` + (r.deleted ? ` (수업기록 ${r.deleted}건 함께 삭제)` : ''));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      idle();
+    }
+  }
 
   // 학생번호 변경: 먼저 몇 건이 바뀌는지 확인하고, 한 번 더 물은 뒤 바꾼다
   async function changeNo(from, input) {
@@ -1004,12 +1055,12 @@
     return `<div class="stats">
       <div class="stat"><div class="k">수업</div><div class="v">${st.count}회</div><div class="s">정규 ${a.정규} · 보강 ${a.보강} · 결강 ${a.결강}</div></div>
       <div class="stat"><div class="k">과제 완료율</div><div class="v">${pct(h.rate)}</div>
-        <div class="s">완료 ${hc.완료} · 미완 ${hc.미완} · 안 함 ${hc['안 함']} · ${left} ${hc['두고 옴']} (과제 없음 ${hc['과제 없음']})</div></div>
+        <div class="s">완료 ${hc.완료} · 50% 이상 ${hc['50% 이상']} · 50% 미만 ${hc['50% 미만']}${hc.미완 ? ` · 미완 ${hc.미완}` : ''} · 안 함 ${hc['안 함']} · ${left} ${hc['두고 옴']} (과제 없음 ${hc['과제 없음']})</div></div>
       <div class="stat"><div class="k">추가 포인트</div><div class="v">${st.points}점</div></div>
       <div class="stat"><div class="k">평균 수업시간</div><div class="v">${st.avgMinutes == null ? '-' : st.avgMinutes + '분'}</div><div class="s">결강 제외</div></div>
     </div>
-    <h3>오답 원인</h3><div class="chips">${st.errors.length ? st.errors.map(([t, n]) => `<span class="chip">${esc(t)} <b>${n}</b></span>`).join('') : '<span class="muted">없음</span>'}</div>
-    <h3>단계 변화</h3>${st.stages.length ? `<ol class="stages">${st.stages.map((x) => `<li>${md(x.date)}부터 <b>${esc(x.stage)}</b> <span class="muted">${x.count}회</span></li>`).join('')}</ol>` : '<span class="muted">없음</span>'}`;
+    <h3>학습 주안점</h3><div class="chips">${st.errors.length ? st.errors.map(([t, n]) => `<span class="chip">${esc(t)} <b>${n}</b></span>`).join('') : '<span class="muted">없음</span>'}</div>
+    <h3>학습 단계 변화</h3>${st.stages.length ? `<ol class="stages">${st.stages.map((x) => `<li>${md(x.date)}부터 <b>${esc(x.stage)}</b> <span class="muted">${x.count}회</span></li>`).join('')}</ol>` : '<span class="muted">없음</span>'}`;
   }
 
   /** 수업 기록 한 장 (타임라인·날짜별 공용). who: 학생 이름을 머리에 보여 줄지 */
@@ -1028,12 +1079,12 @@
         <span class="muted">${time}</span>${Number(r.추가포인트) ? ` <span class="badge ok">+${esc(r.추가포인트)}점</span>` : ''}
         ${r.확인필요상태 === '해결' ? '<span class="badge rv" title="판독 확인필요 항목을 확인함">판독 확인</span>' : ''}</div>
       <div class="entry-grid">
-        ${row('단계', [C.splitList(r.단계).join('·'), r.진행률].filter(Boolean).map(esc).join(' · '))}
+        ${row('학습 단계', [C.splitList(r.단계).join('·'), r.진행률].filter(Boolean).map(esc).join(' · '))}
         ${row('지난 과제', hw)}
         ${row('오늘 진도', chips(r.오늘진도범위))}
         ${row('추가 포인트', chips(r.추가포인트범위))}
         ${row('오늘 과제', chips(r.오늘과제))}
-        ${row('오답 원인', esc(C.splitList(r.오답원인).join(', ')))}
+        ${row('학습 주안점', esc(C.splitList(r.학습주안점).join(', ')))}
         ${row('학습태도', esc(r.학습태도).replace(/\n/g, '<br>'))}
       </div></div>`;
   }
@@ -1215,12 +1266,15 @@
 
   function cardSvg(s, date) {
     if (!s) return '<use href="#pc-card" width="284" height="399"/>';
-    const md = `${+date.slice(5, 7)}/${+date.slice(8, 10)} (${C.weekday(date)})`;
+    const next = C.nextClassDate(s.days, date);
+    const md = `${+date.slice(5, 7)}/${+date.slice(8, 10)} (${C.weekday(date)})`
+      + (next ? ` · 다음 등원일: ${+next.slice(5, 7)}/${+next.slice(8, 10)} (${C.weekday(next)})` : '');
     const bubble = (digit, y) => `<rect x="${108.5 + 24 * digit}" y="${y}" width="8" height="14" rx="4" fill="#111"/>`;
     return '<use href="#pc-card" width="284" height="399"/>'
       + `<g transform="${PX}">${bubble(+s.no[0], 86.5)}${bubble(+s.no[1], 108.5)}</g>`
-      + `<text x="76" y="38.7" font-size="8" fill="#555" font-family='${FONT}'>${esc(md)}</text>`
-      + `<text x="254" y="38.7" font-size="11" font-weight="700" fill="#111" text-anchor="end" font-family='${FONT}'>${esc(s.name)}</text>`;
+      + `<text x="74" y="38.7" font-size="7.5" fill="#555" font-family='${FONT}'>${esc(md)}</text>`
+      // 날짜·다음 등원일과 겹치지 않게 네 글자 넘는 이름은 글자를 줄인다
+      + `<text x="254" y="38.7" font-size="${s.name.length > 3 ? 9 : 11}" font-weight="700" fill="#111" text-anchor="end" font-family='${FONT}'>${esc(s.name)}</text>`;
   }
 
   function sheetsSvg(people, date, blank, paper) {

@@ -6,18 +6,29 @@
 (function (root) {
   'use strict';
 
-  const HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '오답원인', '추가포인트',
+  const HEADERS = ['수업일', '학생번호', '이름', '출결', '등원', '하원', '수업시간(분)', '지난과제', '단계', '진행률', '학습주안점', '추가포인트',
     '지난과제범위', '오늘진도범위', '추가포인트범위', '오늘과제', '학습태도', '확인필요'];
 
   const ENUMS = {
     출결: ['정규', '결강', '보강'],
-    지난과제: ['완료', '미완', '안 함', '두고 옴', '과제 없음'],
-    단계: ['개념', '유형', '단원마무리', '교재오답', 'Test', '경시'],
+    지난과제: ['완료', '50% 이상', '50% 미만', '안 함', '두고 옴', '과제 없음'],
+    단계: ['개념', '유형', '단원마무리', '교재오답', '평가', '경시'],
     진행률: ['50% 미만', '50~75%', '75~100%'],
-    오답원인: ['계산 실수', '개념 이해 부족', '조건 놓침', '풀이 과정 생략'],
+    학습주안점: ['개념 재학습/오개념 수정', '문제 읽기(조건 찾기)', '계산 실수 교정', '풀이 과정 서술'],
     추가포인트: ['0', '3', '6', '9'],
   };
-  const MULTI = ['단계', '오답원인'];
+  const MULTI = ['단계', '학습주안점'];
+  // 양식에서 빠졌지만 옛 카드·기록에 남아 있을 수 있는 값 (2026-10-18 지난과제 '미완' → 50% 이상 / 50% 미만)
+  const LEGACY = { 지난과제: ['미완'] };
+  // 과제 완료율 계산에서 지난과제 값별 점수 (두고 옴은 설정대로, 과제 없음은 세지 않음)
+  const HOMEWORK_SCORE = { 완료: 1, '50% 이상': 0.7, '50% 미만': 0.3, 미완: 0.5, '안 함': 0 };
+  // 2026-10-18 카드 양식 변경 전 이름: 열 '오답원인' → '학습주안점', 보기는 뜻이 같은 것끼리 바꾼다
+  const OLD_FOCUS_COL = '오답원인';
+  const OLD_FOCUS = { '개념 이해 부족': '개념 재학습/오개념 수정', '조건 놓침': '문제 읽기(조건 찾기)', '계산 실수': '계산 실수 교정', '풀이 과정 생략': '풀이 과정 서술' };
+  const focusList = (s) => splitList(s).map((t) => OLD_FOCUS[t] || t).join('; ');
+  // 2026-10-18 학습 단계 보기 'Test' → '평가'
+  const OLD_STAGE = { Test: '평가' };
+  const stageList = (s) => splitList(s).map((t) => OLD_STAGE[t] || t).join('; ');
   const RANGE_COLS = ['지난과제범위', '오늘진도범위', '추가포인트범위', '오늘과제'];
   const BOOKS = ['디딤돌', '자료집', '문장제', '교재오답', '교재오답-자료집', '단원Test', '주간Test', '경시'];
   const MARKS = { '○': '끝냄', '△': '하다 멈춤', '': '아직 안 함' };
@@ -87,7 +98,9 @@
       res.headerErrors.push('파일이 비어 있습니다.');
       return res;
     }
-    const head = recs[0].cells.map((s) => s.trim());
+    // 옛 양식 CSV(오답원인 열)도 받는다
+    const oldFocus = recs[0].cells.some((s) => s.trim() === OLD_FOCUS_COL);
+    const head = recs[0].cells.map((s) => s.trim()).map((h) => (h === OLD_FOCUS_COL ? '학습주안점' : h));
     for (let i = 0; i < Math.max(head.length, HEADERS.length); i++) {
       if (head[i] === HEADERS[i]) continue;
       const got = head[i] == null ? '(없음)' : `"${head[i]}"`;
@@ -101,6 +114,8 @@
     res.cards = recs.slice(1).map((r) => {
       const values = {};
       HEADERS.forEach((h, i) => (values[h] = (r.cells[i] == null ? '' : r.cells[i]).trim()));
+      if (oldFocus) values.학습주안점 = focusList(values.학습주안점);
+      values.단계 = stageList(values.단계);
       return { rowNo: r.rowNo, cellCount: r.cells.length, values };
     });
     if (!res.cards.length) res.headerErrors.push('카드(제목 줄 아래 행)가 없습니다.');
@@ -169,7 +184,7 @@
     };
 
     ['지난과제', '진행률', '추가포인트'].forEach((f) => {
-      if (need(f) && !ENUMS[f].includes(v[f])) err(f, `"${v[f]}"은(는) 목록에 없는 값입니다. (${ENUMS[f].join(' / ')})`);
+      if (need(f) && !ENUMS[f].includes(v[f]) && !(LEGACY[f] || []).includes(v[f])) err(f, `"${v[f]}"은(는) 목록에 없는 값입니다. (${ENUMS[f].join(' / ')})`);
     });
 
     MULTI.forEach((f) => {
@@ -235,7 +250,7 @@
     const out = {};
     HEADERS.forEach((h) => {
       const s = String(values[h] == null ? '' : values[h]).trim();
-      out[h] = MULTI.includes(h) ? splitList(s).join('; ') : s;
+      out[h] = h === '학습주안점' ? focusList(s) : h === '단계' ? stageList(s) : MULTI.includes(h) ? splitList(s).join('; ') : s;
     });
     return out;
   }
@@ -323,6 +338,16 @@
       .sort((a, b) => a.no.localeCompare(b.no));
   }
 
+  /** 그 날짜 다음 등원일 (등원 요일 '월수금' 기준, 휴강·보강은 모름). 요일이 없으면 '' */
+  function nextClassDate(days, date) {
+    if (!validDate(date)) return '';
+    for (let i = 1; i <= 7; i++) {
+      const d = addDays(date, i);
+      if (String(days || '').indexOf(weekday(d)) >= 0) return d;
+    }
+    return '';
+  }
+
   /** 카드 목록을 A4 한 장에 n장씩 나눈다 (마지막 장의 빈 자리는 null) */
   function toSheets(cards, n) {
     const out = [];
@@ -340,7 +365,7 @@
   const GROUPS = ['A', 'B'];
   const GRADES = ['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
   // 설정 "두고옴처리" 값 → 완료율 계산에서의 가중치 (null = 계산에서 제외)
-  const LEFT_WEIGHT = { '안 함과 같이(×0)': 0, '미완과 같이(×0.5)': 0.5, '계산에서 제외': null };
+  const LEFT_WEIGHT = { '안 함과 같이(×0)': 0, '절반만 인정(×0.5)': 0.5, '미완과 같이(×0.5)': 0.5, '계산에서 제외': null };
   const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
   const toUTC = (d) => new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)));
@@ -362,17 +387,19 @@
   const inPeriod = (date, p) => (!p.from || date >= p.from) && (!p.to || date <= p.to);
 
   /**
-   * 과제 완료율 = (완료 + 미완×0.5 + 두고 옴×가중치) ÷ (과제 없음을 뺀 횟수)
+   * 과제 완료율 = (완료 + 50% 이상×0.7 + 50% 미만×0.3 + 두고 옴×가중치) ÷ (과제 없음을 뺀 횟수)
+   * 옛 기록의 '미완'은 ×0.5로 센다.
    * "두고 옴"을 계산에서 제외하면 분모에서도 뺀다. 지난과제가 비어 있는 기록(결강 등)은 세지 않는다.
    */
   function homework(records, leftMode) {
-    const counts = { 완료: 0, 미완: 0, '안 함': 0, '두고 옴': 0, '과제 없음': 0 };
+    const counts = { 완료: 0, '50% 이상': 0, '50% 미만': 0, 미완: 0, '안 함': 0, '두고 옴': 0, '과제 없음': 0 };
     records.forEach((r) => {
       if (r.지난과제 in counts) counts[r.지난과제]++;
     });
     const w = leftMode in LEFT_WEIGHT ? LEFT_WEIGHT[leftMode] : 0;
-    const denom = counts.완료 + counts.미완 + counts['안 함'] + (w === null ? 0 : counts['두고 옴']);
-    const num = counts.완료 + counts.미완 * 0.5 + (w ? counts['두고 옴'] * w : 0);
+    const scored = Object.keys(HOMEWORK_SCORE);
+    const denom = scored.reduce((n, k) => n + counts[k], 0) + (w === null ? 0 : counts['두고 옴']);
+    const num = scored.reduce((n, k) => n + counts[k] * HOMEWORK_SCORE[k], 0) + (w ? counts['두고 옴'] * w : 0);
     return { counts, denom, rate: denom ? num / denom : null };
   }
 
@@ -400,9 +427,9 @@
     });
     const mins = rs.filter((r) => r.출결 !== '결강').map((r) => Number(r['수업시간(분)'])).filter((n) => n > 0);
     const errorMap = {};
-    rs.forEach((r) => splitList(r.오답원인).forEach((t) => (errorMap[t] = (errorMap[t] || 0) + 1)));
+    rs.forEach((r) => splitList(focusList(r.학습주안점)).forEach((t) => (errorMap[t] = (errorMap[t] || 0) + 1)));
     const errors = Object.keys(errorMap).map((k) => [k, errorMap[k]])
-      .sort((a, b) => b[1] - a[1] || ENUMS.오답원인.indexOf(a[0]) - ENUMS.오답원인.indexOf(b[0]));
+      .sort((a, b) => b[1] - a[1] || ENUMS.학습주안점.indexOf(a[0]) - ENUMS.학습주안점.indexOf(b[0]));
     return {
       count: rs.length,
       from: rs.length ? rs[0].수업일 : '',
@@ -426,7 +453,7 @@
   const api = {
     HEADERS, ENUMS, MULTI, RANGE_COLS, BOOKS, MARKS,
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
-    validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, toSheets,
+    validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, nextClassDate, toSheets,
     LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
