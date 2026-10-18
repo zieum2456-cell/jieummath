@@ -63,9 +63,11 @@ async function main() {
       const prev = known.get(key);
       const url = SW.viewUrl(board, item.seq);
       let images = prev ? prev.images : null;
-      if (!prev || week >= recentFrom || !images || !images.length) {
+      // 예전 방식(앞의 2장만 저장)으로 모은 게시물은 이미지를 모두 다시 모은다 (뽑기 결과에 timetable이 없는 것)
+      const oldStyle = prev && prev.extract && !('timetable' in prev.extract);
+      if (!prev || week >= recentFrom || !images || !images.length || oldStyle) {
         try {
-          images = SW.pickImages(SW.parseImages(await get(url)), board);
+          images = SW.parseImages(await get(url));
         } catch (e) {
           errors.push(`${board.grade}학년 "${item.title}": ${e.message}`);
           if (!images) images = [];
