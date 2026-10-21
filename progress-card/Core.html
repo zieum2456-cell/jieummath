@@ -542,7 +542,8 @@
       parseRangeList(r.오늘진도범위).forEach((x) => {
         if (!x.ok || /Test$/.test(x.book)) return;
         const name = x.unit ? unitName(stu.grade, r.수업일, x.unit, stu.semester) : '';
-        const b = (BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` : '') + (name ? `(${name})` : '');
+        // 단원 숫자가 없으면 빈 괄호: '디딤돌()'
+        const b = (BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` + (name ? `(${name})` : '') : '()');
         if (last.books.indexOf(b) < 0) last.books.push(b);
       });
     });
