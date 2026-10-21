@@ -406,22 +406,24 @@
   });
 
   /* 칸 종류 */
+  // 확인 화면 칸 순서는 종이 카드 순서 그대로 (카드와 나란히 놓고 비교하기 쉽게).
+  // half: 넓은 화면에서 카드 한 줄에 같이 있는 칸끼리 두 칸으로 나란히 둔다
   const FIELDS = [
-    { f: '수업일', type: 'text', mode: 'numeric', ph: '2026-10-09' },
-    { f: '학생번호', type: 'text', mode: 'numeric', ph: '56' },
-    { f: '이름', type: 'text' },
-    { f: '출결', type: 'seg' },
-    { f: '시간', type: 'time' },
-    { f: '지난과제', type: 'seg' },
+    { f: '수업일', type: 'text', mode: 'numeric', ph: '2026-10-09', half: true },
+    { f: '이름', type: 'text', half: true },
+    { f: '학생번호', label: '학생 번호', type: 'text', mode: 'numeric', ph: '56' },
+    { f: '시간', type: 'time', half: true },
+    { f: '출결', type: 'seg', half: true },
+    { f: '지난과제', label: '지난 과제', type: 'seg' },
     { f: '단계', label: '학습 단계', type: 'multi' },
+    { f: '지난과제범위', label: '학습 목표 · 지난 과제 범위', type: 'range' },
+    { f: '오늘진도범위', label: '학습 목표 · 오늘 진도', type: 'range' },
     { f: '진행률', type: 'seg' },
-    { f: '학습주안점', type: 'multi' },
-    { f: '추가포인트', type: 'seg' },
-    { f: '지난과제범위', type: 'range' },
-    { f: '오늘진도범위', type: 'range' },
-    { f: '추가포인트범위', type: 'range' },
-    { f: '오늘과제', type: 'range' },
-    { f: '학습태도', label: '지음쌤 톡톡', type: 'area', wide: true },
+    { f: '추가포인트범위', label: '추가 포인트 · 범위', type: 'range', half: true },
+    { f: '추가포인트', label: '추가 포인트', type: 'seg', half: true },
+    { f: '오늘과제', label: '오늘 과제', type: 'range' },
+    { f: '학습주안점', label: '학습 주안점', type: 'multi' },
+    { f: '학습태도', label: '지음쌤 톡톡', type: 'area' },
   ];
   const TIME_FIELDS = ['등원', '하원', '수업시간(분)'];
 
@@ -492,7 +494,7 @@
         <div class="seg"><button type="button" data-act="dup" data-val="skip" class="${c.dupChoice === 'skip' ? 'on' : ''}">건너뛰기 (기존 기록 유지)</button>
         <button type="button" data-act="dup" data-val="overwrite" class="${c.dupChoice === 'overwrite' ? 'on' : ''}">덮어쓰기</button></div></div>`;
     }
-    html += `<div class="fields">${FIELDS.map((d) => `<div class="fld ${d.wide || d.type === 'range' || d.type === 'multi' ? 'wide' : ''}" data-field="${d.f}">
+    html += `<div class="fields">${FIELDS.map((d) => `<div class="fld ${d.half ? '' : 'wide'}" data-field="${d.f}">
         <div class="flabel">${d.f === '시간' ? '등원 · 하원 · 수업시간' : d.label || d.f}<span class="edited">· 수정됨</span>
         <button type="button" class="revert" data-revert="${d.f}">원래 값</button></div>
         ${control(d, v)}<div class="fmsg"></div></div>`).join('')}</div>`;
