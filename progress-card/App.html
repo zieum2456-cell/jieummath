@@ -142,7 +142,8 @@
       const res = await run('api_registerUpload', {
         fileName: name,
         b64: toB64(buf),
-        classDate: parsed.fileDate || cards[0].values.수업일,
+        // 수업일은 카드에 적힌 날짜 기준 (여러 날이 섞이면 모두)
+        classDate: [...new Set(cards.map((c) => c.values.수업일).filter(Boolean))].sort().join(', ') || parsed.fileDate,
         cardCount: cards.length,
         reviewCount,
       });

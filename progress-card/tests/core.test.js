@@ -63,6 +63,16 @@ test('범위 항목 해석', () => {
   assert.equal(C.parseRangeItem('디딤돌[95]x').ok, false);
 });
 
+test('2026-10-21 교재 8종·경시대회, 페이지 앞 p는 그대로 둔다', () => {
+  ['디딤돌', '자료집', '문장제', '탄탄북', '연산', '개념다시쓰기', '교재오답', '학습지오답', '단원Test', '주간Test', '경시대회'].forEach((b) => {
+    assert.equal(C.parseRangeItem(`${b}(2)[10~12]○`).book, b);
+  });
+  assert.equal(C.parseRangeItem('개념다시쓰기(3)[p58~63]').range, 'p58~63');
+  assert.equal(C.parseRangeItem('경시[기출 연습]').book, '경시'); // 예전 기록
+  const recs = [{ 수업일: '2026-10-20', 출결: '정규', 단계: '개념', 오늘진도범위: '탄탄북(3)[10~12]○; 학습지오답(3)[]○; 경시대회[기출]○' }];
+  assert.ok(C.parentReport({ name: '김하린', grade: '초5' }, recs).includes(' · 10/20 개념 학습 · 탄탄북 3단원(합동과 대칭), 학습지 오답 3단원(합동과 대칭), 경시대회\n'));
+});
+
 test('열 이름·순서 오류는 몇 번째 열인지 알려 준다', () => {
   const swapped = [...C.HEADERS];
   [swapped[4], swapped[5]] = [swapped[5], swapped[4]];
