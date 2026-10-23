@@ -1,6 +1,77 @@
 {
- "updatedAt": "2026-10-18T15:43:02.531Z",
+ "updatedAt": "2026-10-23T00:34:38.498Z",
  "weeks": [
+  {
+   "monday": "2026-10-26",
+   "grades": {
+    "4": {
+     "seq": "34274912",
+     "title": "4학년- 10월 26일 ~ 10월 30일(11주)",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306004&viewBoardID=306004&boardSeq=34274912&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020504&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261023_092311220_86575.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261023_092311283_28194.jpg"
+     ],
+     "extract": {
+      "from": [
+       "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261023_092311220_86575.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261023_092311283_28194.jpg"
+      ],
+      "plan": "school-weekly/2026-10-26/4.jpg",
+      "timetable": 1,
+      "math": {
+       "1": [
+        "월",
+        "금"
+       ],
+       "2": [
+        "월",
+        "금"
+       ],
+       "3": [
+        "월",
+        "금"
+       ],
+       "4": [
+        "월",
+        "금"
+       ],
+       "5": [
+        "월",
+        "수"
+       ],
+       "6": [
+        "월",
+        "금"
+       ],
+       "7": [
+        "월",
+        "금"
+       ],
+       "8": [
+        "월",
+        "금"
+       ],
+       "9": [
+        "월",
+        "금"
+       ],
+       "10": [
+        "월",
+        "금"
+       ],
+       "11": [
+        "월",
+        "금"
+       ]
+      },
+      "guessed": [
+       4
+      ]
+     }
+    }
+   }
+  },
   {
    "monday": "2026-10-19",
    "grades": {
