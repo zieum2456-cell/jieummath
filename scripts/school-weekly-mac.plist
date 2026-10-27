@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 설치: REPO를 이 스크립트 전용 클론 경로로 바꿔 ~/Library/LaunchAgents/kr.jieummath.school-weekly.plist로 복사한 뒤
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/kr.jieummath.school-weekly.plist
+     맥북이 잠자고 있었으면 깨어날 때 실행된다. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>kr.jieummath.school-weekly</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>REPO/scripts/school-weekly-mac.sh</string></array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Weekday</key><integer>6</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>REPO/../school-weekly-mac.log</string>
+  <key>StandardErrorPath</key><string>REPO/../school-weekly-mac.log</string>
+</dict>
+</plist>

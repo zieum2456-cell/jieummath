@@ -1,11 +1,14 @@
 # 학교 주간학습안내 게시판(3~6학년)을 읽어 school-weekly-data.json을 갱신하고,
 # 무료 OCR(tesseract)로 학년별 수학·가정통신 줄 이미지(school-weekly/)와 반별 수학 요일을 뽑는다.
 # 바뀐 내용이 있을 때만 커밋한다. GitHub Actions 탭에서 "Run workflow"로 바로 실행할 수도 있다.
+# 2026-10-24부터 게시판이 이 서버를 막아서(ice.go.kr/law로 넘김) 게시판 읽기는 맥북(scripts/school-weekly-mac.sh)이 하고,
+# 맥북이 데이터를 올리면 여기서 뽑기만 이어서 한다.
 name: 주간학습안내 모으기
 
 on:
-  schedule:
-    - cron: '0 0 * * 5,6,0' # 매주 금·토·일 한국 시각 09:00 (UTC 00:00)
+  push:
+    branches: [claude/student-payment-notification-j7g4us]
+    paths: [school-weekly-data.json]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +27,8 @@ jobs:
         with:
           node-version: 22
       - name: 게시판 읽기
+        if: github.event_name != 'push'
+        continue-on-error: true # 막혀 있어도 이미 올라온 데이터로 뽑기는 한다
         run: node scripts/school-weekly-fetch.js
       - name: OCR 준비
         run: |
