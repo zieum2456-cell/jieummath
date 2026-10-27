@@ -1,9 +1,82 @@
 {
- "updatedAt": "2026-10-23T00:34:38.498Z",
+ "updatedAt": "2026-10-27T05:12:08.592Z",
  "weeks": [
   {
    "monday": "2026-10-26",
    "grades": {
+    "3": {
+     "seq": "34276756",
+     "title": "10월 26일~10월 30일 주간학습안내(2학기 11주)",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306002&viewBoardID=306002&boardSeq=34276756&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020503&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261023_141311286_11865.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261023_141316267_78125.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261023_141321595_10628.jpg"
+     ],
+     "extract": {
+      "from": [
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261023_141311286_11865.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261023_141316267_78125.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261023_141321595_10628.jpg"
+      ],
+      "plan": "school-weekly/2026-10-26/3.jpg",
+      "timetable": 1,
+      "math": {
+       "1": [
+        "월",
+        "화",
+        "금"
+       ],
+       "2": [
+        "월",
+        "수",
+        "금"
+       ],
+       "3": [
+        "화",
+        "수",
+        "금"
+       ],
+       "4": [
+        "월",
+        "수",
+        "금"
+       ],
+       "5": [
+        "화",
+        "금"
+       ],
+       "6": [
+        "월",
+        "수",
+        "금"
+       ],
+       "7": [
+        "월",
+        "화",
+        "수"
+       ],
+       "8": [
+        "월",
+        "화",
+        "수"
+       ],
+       "9": [
+        "월",
+        "화",
+        "수"
+       ],
+       "10": [
+        "월",
+        "화",
+        "수"
+       ]
+      },
+      "guessed": [
+       9
+      ]
+     }
+    },
     "4": {
      "seq": "34274912",
      "title": "4학년- 10월 26일 ~ 10월 30일(11주)",
@@ -67,6 +140,163 @@
       },
       "guessed": [
        4
+      ]
+     }
+    },
+    "5": {
+     "seq": "34275940",
+     "title": "5학년_10월26일 - 10월30일(11주)",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34275940&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127579_30235.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127643_00888.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127700_14134.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127756_71421.jpg"
+     ],
+     "extract": {
+      "from": [
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127579_30235.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127643_00888.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127700_14134.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261023_115127756_71421.jpg"
+      ],
+      "plan": "school-weekly/2026-10-26/5.jpg",
+      "timetable": 2,
+      "math": {
+       "1": [
+        "목",
+        "금"
+       ],
+       "2": [
+        "화",
+        "금"
+       ],
+       "3": [
+        "목",
+        "금"
+       ],
+       "4": [
+        "월",
+        "목"
+       ],
+       "5": [
+        "월",
+        "목"
+       ],
+       "6": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "7": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "8": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "9": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "10": [
+        "월",
+        "목"
+       ],
+       "11": [
+        "월",
+        "목"
+       ]
+      },
+      "guessed": []
+     }
+    },
+    "6": {
+     "seq": "34278064",
+     "title": "6학년 2학기 11주 (10.26~10.30) 주간학습안내",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306008&viewBoardID=306008&boardSeq=34278064&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020506&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261026_083905490_54374.png",
+      "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261026_083917241_60893.png"
+     ],
+     "extract": {
+      "from": [
+       "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261026_083905490_54374.png",
+       "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261026_083917241_60893.png"
+      ],
+      "plan": "school-weekly/2026-10-26/6.jpg",
+      "timetable": 1,
+      "math": {
+       "1": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "2": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "3": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "4": [
+        "월",
+        "목",
+        "금"
+       ],
+       "5": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "6": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "7": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "8": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "9": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "10": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ]
+      },
+      "guessed": [
+       10
       ]
      }
     }
