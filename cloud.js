@@ -47,8 +47,10 @@
 
   function countText(json) {
     try {
-      const n = (JSON.parse(json).students || []).length;
-      return `학생 ${n}명`;
+      const data = JSON.parse(json);
+      const n = (data.students || []).length;
+      const w = (data.waitlist || []).length;
+      return `학생 ${n}명` + (w ? `, 대기 ${w}명` : '');
     } catch (e) {
       return '데이터';
     }
