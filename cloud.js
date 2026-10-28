@@ -24,13 +24,25 @@
    *   local, cloud: JSON 문자열 또는 null
    *   dirty: 로그인 상태에서 고쳤는데 아직 온라인에 저장되지 못한 내용이 있음 (오프라인 등)
    *   linked: 이 브라우저가 이미 같은 계정으로 연결된 적 있음
+   *   cloudChanged: 이 브라우저가 마지막으로 맞춘 뒤 다른 기기에서 온라인 데이터가 바뀜
    * 결과: 'none' | 'upload' | 'download' | 'ask'
    */
-  function decide({ local, cloud, dirty, linked }) {
+  function decide({ local, cloud, dirty, linked, cloudChanged }) {
     if (cloud == null) return local == null ? 'none' : 'upload';
     if (local == null || local === cloud) return 'download';
-    if (linked) return dirty ? 'upload' : 'download';
+    if (linked) {
+      if (!dirty) return 'download';
+      // 못 올린 변경이 있어도, 그사이 다른 기기에서 바뀌었으면 몰래 덮어쓰지 않고 물어본다
+      return cloudChanged ? 'ask' : 'upload';
+    }
     return 'ask'; // 처음 연결하는 브라우저에 다른 데이터가 있음
+  }
+
+  // 온라인 데이터가 바뀌었는지 비교하려고 남겨 두는 짧은 지문
+  function hash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+    return str.length.toString(36) + '.' + h.toString(36);
   }
 
   function countText(json) {
@@ -64,6 +76,7 @@
   let timer = null;
   let ready = false; // 로그인 직후 첫 맞추기가 끝났는지
   let status = 'off';
+  let syncedAt = null; // 온라인과 마지막으로 맞춘 시각
   const watchers = []; // { key, cb, stop }
 
   const flagKey = (name) => `${opts.storeKey}-cloud-${name}`;
@@ -77,7 +90,14 @@
 
   function setStatus(s) {
     status = s;
+    if (s === 'saved') syncedAt = new Date();
     render();
+  }
+
+  // 온라인과 맞춘 내용을 기억해 둔다 (다음에 열 때 다른 기기에서 바뀌었는지 알 수 있게)
+  function markSynced(json) {
+    lastJson = json;
+    setFlag('base', json == null ? null : hash(json));
   }
 
   function render() {
@@ -93,14 +113,18 @@
       el.innerHTML = '<button class="btn small" data-cloud="login">구글 로그인 (온라인 저장)</button>';
       return;
     }
+    const time = syncedAt
+      ? ` ${String(syncedAt.getHours()).padStart(2, '0')}:${String(syncedAt.getMinutes()).padStart(2, '0')}`
+      : '';
     const text = {
       syncing: '불러오는 중…',
       saving: '저장 중…',
-      saved: '온라인 저장됨',
+      saved: '온라인 저장됨' + time,
       offline: '오프라인 · 연결되면 저장',
       error: '온라인 저장 실패',
     }[status] || '';
-    el.innerHTML = `<span class="cloud-status ${status === 'error' ? 'err' : ''}" title="${esc(user.email)}">${text}</span>`
+    const who = String(user.email || '').split('@')[0];
+    el.innerHTML = `<span class="cloud-status ${status === 'error' ? 'err' : ''}" title="${esc(user.email)}">${text}${who ? ` · ${esc(who)}` : ''}</span>`
       + `<button class="btn small" data-cloud="logout" title="${esc(user.email)}">로그아웃</button>`;
   }
 
@@ -135,6 +159,14 @@
     auth = fb.getAuth(app);
     db = fb.getFirestore(app);
     window.addEventListener('online', () => { if (user && status === 'offline') flush(); });
+    // 휴대폰은 뒤로 보낸 탭을 다시 켤 때 예전 화면을 그대로 보여 주므로,
+    // 화면을 떠날 때는 남은 변경을 바로 올리고, 돌아오면 온라인 최신본을 다시 받아온다.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
+      else refresh();
+    });
+    window.addEventListener('pagehide', () => { flush(); });
+    window.addEventListener('pageshow', (ev) => { if (ev.persisted) refresh(); });
     fb.getRedirectResult(auth).catch(loginError);
     fb.onAuthStateChanged(auth, (u) => {
       if (unsubscribe) unsubscribe();
@@ -228,11 +260,12 @@
     unsubscribe = fb.onSnapshot(ref, { includeMetadataChanges: false }, (snap) => {
       if (!user || user.uid !== uid) return;
       const cloud = snap.exists() ? snap.data().json : null;
-      if (!ready) return firstSync(cloud);
+      if (!ready) return reconcile(cloud);
       if (snap.metadata.hasPendingWrites || timer) return; // 내가 보낸 것 / 곧 보낼 것이 있음
       if (cloud != null && cloud !== lastJson) {
-        lastJson = cloud;
+        markSynced(cloud);
         opts.applyRemote(JSON.parse(cloud));
+        setStatus('saved');
       }
     }, (e) => {
       console.error(e);
@@ -241,21 +274,28 @@
     });
   }
 
-  function firstSync(cloud) {
+  // 로그인 직후, 그리고 화면으로 돌아올 때마다 이 브라우저와 온라인 데이터를 맞춘다
+  function reconcile(cloud) {
     const local = JSON.stringify(opts.getState());
     const hasLocal = (() => {
       try { return localStorage.getItem(opts.storeKey) != null; } catch (e) { return false; }
     })();
+    const linked = getFlag('uid') === user.uid;
+    const base = getFlag('base');
     const action = decide({
       local: hasLocal ? local : null,
       cloud,
       dirty: getFlag('dirty') === '1',
-      linked: getFlag('uid') === user.uid,
+      linked,
+      cloudChanged: cloud != null && (!base || base !== hash(cloud)),
     });
     let use = action;
     if (action === 'ask') {
-      const ok = confirm(`온라인에 저장된 ${opts.label} 데이터(${countText(cloud)})가 있습니다.\n`
-        + `이 브라우저에도 다른 데이터(${countText(local)})가 있습니다.\n\n`
+      const ok = confirm((linked
+        ? `다른 기기에서 ${opts.label} 데이터(${countText(cloud)})가 바뀌었는데,\n`
+          + `이 브라우저에도 아직 온라인에 올리지 못한 변경(${countText(local)})이 있습니다.\n\n`
+        : `온라인에 저장된 ${opts.label} 데이터(${countText(cloud)})가 있습니다.\n`
+          + `이 브라우저에도 다른 데이터(${countText(local)})가 있습니다.\n\n`)
         + '[확인] 온라인 데이터를 사용합니다. 이 브라우저 데이터는 백업 파일로 내려받아 둡니다.\n'
         + '[취소] 이 브라우저 데이터로 온라인 데이터를 덮어씁니다.');
       if (ok) {
@@ -268,16 +308,34 @@
     setFlag('uid', user.uid);
     ready = true;
     if (use === 'download') {
-      lastJson = cloud;
+      markSynced(cloud);
       setFlag('dirty', null);
-      opts.applyRemote(JSON.parse(cloud));
+      if (cloud !== local) opts.applyRemote(JSON.parse(cloud));
       setStatus('saved');
     } else if (use === 'upload') {
       lastJson = cloud;
       push(true);
     } else {
-      lastJson = cloud;
+      markSynced(cloud);
       setStatus('saved');
+    }
+  }
+
+  // 화면으로 돌아왔을 때: 열어 둔 사이 다른 기기에서 바뀐 내용을 서버에서 직접 받아온다
+  let refreshing = false;
+  async function refresh() {
+    if (!user || !ready || !ref || refreshing) return;
+    if (timer) return flush();
+    refreshing = true;
+    const uid = user.uid;
+    try {
+      const snap = await fb.getDocFromServer(ref);
+      if (!user || user.uid !== uid || timer) return;
+      reconcile(snap.exists() ? snap.data().json : null);
+    } catch (e) {
+      console.error(e); // 오프라인 등: 연결되면 실시간 구독이 이어서 받아온다
+    } finally {
+      refreshing = false;
     }
   }
 
@@ -326,6 +384,7 @@
     lastJson = json;
     try {
       await fb.setDoc(ref, { json, updatedAt: fb.serverTimestamp() });
+      setFlag('base', hash(json));
       if (JSON.stringify(opts.getState()) === json) {
         setFlag('dirty', null);
         setStatus('saved');
@@ -336,5 +395,5 @@
     }
   }
 
-  return { decide, inAppBrowser, attach, push, flush, watch };
+  return { decide, hash, inAppBrowser, attach, push, flush, watch };
 });

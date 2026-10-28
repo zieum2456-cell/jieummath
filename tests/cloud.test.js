@@ -16,8 +16,20 @@ test('이 브라우저에 데이터가 없거나 같으면 온라인 데이터�
 });
 
 test('이미 연결된 브라우저: 저장 못 한 변경이 있으면 올리고, 없으면 온라인 데이터를 쓴다', () => {
-  assert.equal(decide({ local: A, cloud: B, linked: true, dirty: true }), 'upload');
+  assert.equal(decide({ local: A, cloud: B, linked: true, dirty: true, cloudChanged: false }), 'upload');
   assert.equal(decide({ local: A, cloud: B, linked: true, dirty: false }), 'download');
+  assert.equal(decide({ local: A, cloud: B, linked: true, dirty: false, cloudChanged: true }), 'download');
+});
+
+test('못 올린 변경이 있는데 그사이 다른 기기에서 바뀌었으면 덮어쓰지 않고 물어본다', () => {
+  assert.equal(decide({ local: A, cloud: B, linked: true, dirty: true, cloudChanged: true }), 'ask');
+});
+
+test('지문: 같은 내용은 같고, 다른 내용은 다르다', () => {
+  const { hash } = require('../cloud.js');
+  assert.equal(hash(A), hash(A));
+  assert.notEqual(hash(A), hash(B));
+  assert.notEqual(hash('{"a":"가나"}'), hash('{"a":"가다"}'));
 });
 
 test('처음 연결하는 브라우저에 다른 데이터가 있으면 물어본다', () => {
