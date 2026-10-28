@@ -292,6 +292,108 @@
     return { ...student, startDate: prev.start, history };
   }
 
+  /* ---------- 대기 학생 CSV 불러오기 (노션 데이터베이스 내보내기 등) ---------- */
+
+  /** CSV 글자를 줄 × 칸 배열로 (따옴표 안의 쉼표·줄바꿈 처리) */
+  function parseCsv(text) {
+    const src = String(text || '').replace(/^﻿/, '');
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (quoted) {
+        if (c === '"' && src[i + 1] === '"') { cell += '"'; i++; }
+        else if (c === '"') quoted = false;
+        else cell += c;
+      } else if (c === '"') quoted = true;
+      else if (c === ',') { row.push(cell); cell = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && src[i + 1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+      } else cell += c;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter((r) => r.some((x) => x.trim() !== ''));
+  }
+
+  const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+  /** '2026/10/21', '2026년 10월 21일 오후 3:00', 'October 21, 2026' 등 → '2026-10-21' (못 읽으면 '') */
+  function parseLooseDate(str) {
+    const t = String(str || '').trim();
+    const ymd = (y, m, d) => (m >= 1 && m <= 12 && d >= 1 && d <= 31
+      ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '');
+    let m = t.match(/(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
+    if (m) return ymd(+m[1], +m[2], +m[3]);
+    m = t.match(/([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/);
+    if (m && MONTHS[m[1].toLowerCase()]) return ymd(+m[3], MONTHS[m[1].toLowerCase()], +m[2]);
+    m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); // 10/21/2026
+    if (m) return ymd(+m[3], +m[1], +m[2]);
+    return '';
+  }
+
+  /** '초등 5학년', '5학년', '중학교 1학년', '초5' → GRADES 이름 (못 읽으면 원래 글자) */
+  function normalizeGrade(str) {
+    const t = String(str || '').replace(/\s/g, '');
+    if (!t) return '';
+    if (GRADES.includes(t)) return t;
+    const m = t.match(/^(초|중|고)\D*(\d)/) || t.match(/^(\d)학년$/);
+    if (!m) return String(str).trim();
+    const g = m.length === 3 ? m[1] + m[2] : '초' + m[1];
+    return GRADES.includes(g) ? g : String(str).trim();
+  }
+
+  // 열 이름으로 어느 칸인지 판단 (위에서부터 먼저 맞는 것)
+  const WAIT_COLUMNS = [
+    ['time', /요일|시간|가능/],
+    ['contact', /내용|상담|메모|비고|노트|기록|진행|note|memo/i],
+    ['phone', /연락처|전화|휴대|핸드폰|번호|phone|tel|mobile/i],
+    ['grade', /학년|grade/i],
+    ['date', /날짜|일자|일시|대기일|문의일|등록일|date|created/i],
+    ['name', /이름|성명|학생|name/i],
+  ];
+
+  /**
+   * CSV → 대기 학생 목록. 알아보지 못한 열이나 같은 칸에 두 번째로 맞는 열은
+   * '열 이름: 값' 으로 연락 내용 메모 끝에 붙여 빠지는 내용이 없게 한다.
+   * 반환: { items: [{ date, grade, name, phone, time, contact }], columns: { 열 이름: 칸 | null } }
+   */
+  function waitlistFromCsv(text) {
+    const [head, ...rows] = parseCsv(text);
+    if (!head) return { items: [], columns: {} };
+    const used = new Set();
+    const fields = head.map((h) => {
+      const hit = WAIT_COLUMNS.find(([, re]) => re.test(h.trim()));
+      if (!hit) return null;
+      if (used.has(hit[0]) && hit[0] !== 'contact' && hit[0] !== 'time') return null;
+      used.add(hit[0]);
+      return hit[0];
+    });
+    const items = rows.map((r) => {
+      const w = { date: '', grade: '', name: '', phone: '', time: '', contact: '' };
+      const extra = [];
+      head.forEach((h, i) => {
+        const v = String(r[i] ?? '').trim();
+        if (!v) return;
+        const f = fields[i];
+        if (f === 'date') {
+          w.date = parseLooseDate(v);
+          if (!w.date) extra.push(`${h.trim()}: ${v}`); // 날짜로 못 읽으면 메모에 그대로
+        } else if (f === 'grade') w.grade = normalizeGrade(v);
+        else if (f === 'time' || f === 'contact') w[f] = w[f] ? `${w[f]}\n${v}` : v;
+        else if (f === 'name' || f === 'phone') w[f] = v;
+        else if (!f) extra.push(`${h.trim()}: ${v}`);
+      });
+      if (extra.length) w.contact = [w.contact, ...extra].filter(Boolean).join('\n');
+      return w;
+    });
+    const columns = {};
+    head.forEach((h, i) => (columns[h.trim()] = fields[i]));
+    return { items: items.filter((w) => Object.values(w).some(Boolean)), columns };
+  }
+
   return {
     WEEKDAYS,
     GRADES,
@@ -315,5 +417,9 @@
     normalizeNo,
     rosterText,
     daysText,
+    parseCsv,
+    parseLooseDate,
+    normalizeGrade,
+    waitlistFromCsv,
   };
 });
