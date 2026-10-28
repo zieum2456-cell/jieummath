@@ -155,3 +155,30 @@ test('회차 차감 결강만 있으면 결강 줄 없이 결강(회차차감) �
   assert.match(msg, /--\n결강\(회차차감\): 10\/14$/);
   assert.ok(!/^결강: /m.test(msg));
 });
+
+test('대기 학생 CSV: 노션 내보내기 열 이름 맞추기', () => {
+  const csv = '﻿이름,대기 날짜,학년,학부모 연락처,등록 가능 요일/시간,연락 내용,상태\n'
+    + '김하린,"2026년 10월 21일",초등 5학년,010-1234-5678,"월수금 4시 이후, 토 오전",10/21 전화 문의,대기\n'
+    + ',October 3 2026,중1,010-0000-0000,"화목\n6시",,\n'
+    + ',,,,,,\n';
+  const { items, columns } = P.waitlistFromCsv(csv);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items[0], {
+    date: '2026-10-21', grade: '초5', name: '김하린', phone: '010-1234-5678',
+    time: '월수금 4시 이후, 토 오전', contact: '10/21 전화 문의\n상태: 대기',
+  });
+  assert.equal(items[1].date, '2026-10-03');
+  assert.equal(items[1].time, '화목\n6시');
+  assert.equal(columns['상태'], null);
+});
+
+test('날짜 · 학년 읽기', () => {
+  assert.equal(P.parseLooseDate('2026/10/21 3:00 PM'), '2026-10-21');
+  assert.equal(P.parseLooseDate('Oct 21, 2026'), '2026-10-21');
+  assert.equal(P.parseLooseDate('10/21/2026'), '2026-10-21');
+  assert.equal(P.parseLooseDate('다음 주'), '');
+  assert.equal(P.normalizeGrade('중학교 2학년'), '중2');
+  assert.equal(P.normalizeGrade('6학년'), '초6');
+  assert.equal(P.normalizeGrade('고1'), '고1');
+  assert.equal(P.normalizeGrade('7세'), '7세');
+});

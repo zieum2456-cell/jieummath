@@ -231,7 +231,10 @@
       </form>
     </div>
     <div class="card">
-      <h2>대기 학생 목록 <span class="muted">(대기 날짜 순)</span></h2>
+      <div class="toolbar">
+        <h2 style="margin:0">대기 학생 목록 <span class="muted">(대기 날짜 순)</span></h2>
+        <label class="btn" style="flex-direction:row;color:var(--text)" title="노션 데이터베이스: ··· → 내보내기 → Markdown &amp; CSV">CSV 불러오기 (노션 등)<input type="file" id="w-import" accept=".csv,text/csv" class="hidden"></label>
+      </div>
       <div class="table-wrap"><table>
         <thead><tr><th>대기 날짜</th><th>학년</th><th>이름</th><th>학부모 연락처</th><th>등록 가능한 요일 · 시간</th><th>등록 관련 연락 내용</th><th></th></tr></thead>
         <tbody id="wait-body"></tbody>
@@ -292,7 +295,7 @@
 
 <script src="firebase-config.js?v=20261010"></script>
 <script src="cloud.js?v=20261029"></script>
-<script src="payment.js?v=20261028"></script>
-<script src="app.js?v=20261029"></script>
+<script src="payment.js?v=20261029"></script>
+<script src="app.js?v=20261030"></script>
 </body>
 </html>

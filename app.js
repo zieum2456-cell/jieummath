@@ -424,6 +424,34 @@
   });
   $('w-cancel').addEventListener('click', () => fillWaitForm(null));
 
+  const FIELD_NAMES = { date: '대기 날짜', grade: '학년', name: '이름', phone: '학부모 연락처', time: '요일·시간', contact: '연락 내용' };
+  $('w-import').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const { items, columns } = P.waitlistFromCsv(await file.text());
+      if (!items.length) throw new Error('불러올 줄이 없습니다.');
+      const key = (w) => [w.date, w.name, w.phone.replace(/\D/g, '')].join('|');
+      const have = new Set(state.waitlist.map(key));
+      const fresh = items.filter((w) => !have.has(key(w)));
+      const map = Object.entries(columns)
+        .map(([h, f]) => `· ${h} → ${f ? FIELD_NAMES[f] : '연락 내용에 덧붙임'}`)
+        .join('\n');
+      const skipped = items.length - fresh.length;
+      if (!fresh.length) return alert(`${items.length}명 모두 이미 목록에 있습니다.`);
+      if (!confirm(`대기 학생 ${fresh.length}명을 추가할까요?${skipped ? ` (이미 있는 ${skipped}명은 건너뜀)` : ''}\n\n열 맞춤:\n${map}`)) return;
+      fresh.forEach((w) => state.waitlist.push({ id: uid(), ...w }));
+      save();
+      renderWaitlist();
+      const noDate = fresh.filter((w) => !w.date).length;
+      alert(`${fresh.length}명을 추가했습니다.` + (noDate ? `\n대기 날짜를 읽지 못한 ${noDate}명은 날짜가 비어 있으니 수정해 주세요.` : ''));
+    } catch (err) {
+      alert('불러오기 실패: ' + err.message);
+    } finally {
+      e.target.value = '';
+    }
+  });
+
   function renderWaitlist() {
     const list = [...state.waitlist].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const tel = (p) => (p ? `<a href="tel:${esc(p.replace(/[^0-9+]/g, ''))}">${esc(p)}</a>` : '-');
