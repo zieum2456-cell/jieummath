@@ -68,6 +68,8 @@
   .checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .empty { text-align: center; color: var(--muted); padding: 24px; }
+  .table-wrap td.memo { white-space: pre-wrap; min-width: 160px; max-width: 280px; }
+  #wait-form textarea { min-height: 70px; }
 </style>
 </head>
 <body>
@@ -79,6 +81,7 @@
   <nav id="tabs">
     <button data-tab="dashboard" class="active">결제 현황</button>
     <button data-tab="students">학생 관리<span id="stu-count"></span></button>
+    <button data-tab="waitlist">대기 학생<span id="wait-count"></span></button>
     <button data-tab="holidays">전체 휴강</button>
     <button data-tab="settings">설정 · 백업</button>
   </nav>
@@ -205,6 +208,37 @@
     </div>
   </section>
 
+  <!-- 대기 학생 -->
+  <section id="tab-waitlist" class="hidden">
+    <div class="card">
+      <h2 id="w-title">대기 학생 추가</h2>
+      <form id="wait-form">
+        <input type="hidden" id="w-id">
+        <div class="row">
+          <label>대기 날짜<input type="date" id="w-date" required></label>
+          <label>학년<select id="w-grade"></select></label>
+          <label>이름(선택)<input id="w-name" size="8"></label>
+          <label>학부모 연락처<input id="w-phone" type="tel" inputmode="tel" placeholder="010-0000-0000" size="14"></label>
+        </div>
+        <div class="grid2" style="margin-top:8px;gap:8px">
+          <label>등록 가능한 요일 · 시간<textarea id="w-time" placeholder="예: 월수금 4시 이후, 토요일 오전 가능"></textarea></label>
+          <label>등록 관련 연락 내용<textarea id="w-contact" placeholder="예: 10/28 전화 상담, 11월 자리 나면 연락 드리기로 함"></textarea></label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary" type="submit">저장</button>
+          <button class="btn" type="button" id="w-cancel">취소</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>대기 학생 목록 <span class="muted">(대기 날짜 순)</span></h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>대기 날짜</th><th>학년</th><th>이름</th><th>학부모 연락처</th><th>등록 가능한 요일 · 시간</th><th>등록 관련 연락 내용</th><th></th></tr></thead>
+        <tbody id="wait-body"></tbody>
+      </table></div>
+    </div>
+  </section>
+
   <!-- 전체 휴강 -->
   <section id="tab-holidays" class="hidden">
     <div class="card">
@@ -257,8 +291,8 @@
 </main>
 
 <script src="firebase-config.js?v=20261010"></script>
-<script src="cloud.js?v=20261028"></script>
+<script src="cloud.js?v=20261029"></script>
 <script src="payment.js?v=20261028"></script>
-<script src="app.js?v=20261028"></script>
+<script src="app.js?v=20261029"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@
   const DEFAULT_STATE = {
     students: [],
     holidays: [],
+    waitlist: [], // 대기 학생 { id, date, grade, name, phone, time, contact }
     settings: { dueBasis: 'next', soonDays: 3, prefix: '', suffix: '' },
   };
 
@@ -16,7 +17,12 @@
   let currentTab = 'dashboard';
 
   function normalize(s) {
-    return { ...DEFAULT_STATE, ...s, settings: { ...DEFAULT_STATE.settings, ...(s.settings || {}) } };
+    return {
+      ...DEFAULT_STATE,
+      ...s,
+      waitlist: Array.isArray(s.waitlist) ? s.waitlist : [],
+      settings: { ...DEFAULT_STATE.settings, ...(s.settings || {}) },
+    };
   }
 
   function load() {
@@ -63,9 +69,10 @@
   const feeText = (s) => (s.fee != null ? Number(s.fee).toLocaleString('ko-KR') + '원' : '-');
 
   /* ---------- 탭 ---------- */
-  const TABS = ['dashboard', 'students', 'holidays', 'settings', 'detail'];
+  const TABS = ['dashboard', 'students', 'waitlist', 'holidays', 'settings', 'detail'];
   function updateStudentCount() {
     $('stu-count').textContent = `(${state.students.length})`;
+    $('wait-count').textContent = state.waitlist.length ? `(${state.waitlist.length})` : '';
   }
 
   function show(tab, { keepScroll = false } = {}) {
@@ -74,6 +81,7 @@
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     if (tab === 'dashboard') renderDashboard();
     if (tab === 'students') renderStudents();
+    if (tab === 'waitlist') renderWaitlist();
     if (tab === 'holidays') renderHolidays();
     if (tab === 'settings') renderSettings();
     if (tab === 'detail') renderDetail();
@@ -379,6 +387,72 @@
     });
   }
 
+  /* ---------- 대기 학생 ---------- */
+  $('w-grade').innerHTML = '<option value="">선택</option>' + P.GRADES.map((g) => `<option>${g}</option>`).join('');
+  const findWait = (id) => state.waitlist.find((w) => w.id === id);
+
+  function fillWaitForm(w) {
+    $('w-title').textContent = w ? `대기 학생 수정${w.name ? ': ' + w.name : ''}` : '대기 학생 추가';
+    $('w-id').value = w ? w.id : '';
+    $('w-date').value = w ? w.date : P.today();
+    const grade = (w && w.grade) || '';
+    if (grade && ![...$('w-grade').options].some((o) => o.value === grade)) $('w-grade').add(new Option(grade, grade));
+    $('w-grade').value = grade;
+    $('w-name').value = w ? w.name || '' : '';
+    $('w-phone').value = w ? w.phone || '' : '';
+    $('w-time').value = w ? w.time || '' : '';
+    $('w-contact').value = w ? w.contact || '' : '';
+  }
+
+  $('wait-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const data = {
+      date: $('w-date').value,
+      grade: $('w-grade').value,
+      name: $('w-name').value.trim(),
+      phone: $('w-phone').value.trim(),
+      time: $('w-time').value.trim(),
+      contact: $('w-contact').value.trim(),
+    };
+    if (!data.date) return alert('대기 날짜를 입력해 주세요.');
+    const id = $('w-id').value;
+    if (id && findWait(id)) Object.assign(findWait(id), data);
+    else state.waitlist.push({ id: uid(), ...data });
+    save();
+    fillWaitForm(null);
+    renderWaitlist();
+  });
+  $('w-cancel').addEventListener('click', () => fillWaitForm(null));
+
+  function renderWaitlist() {
+    const list = [...state.waitlist].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const tel = (p) => (p ? `<a href="tel:${esc(p.replace(/[^0-9+]/g, ''))}">${esc(p)}</a>` : '-');
+    $('wait-body').innerHTML = list.length
+      ? list
+          .map(
+            (w) => `<tr><td>${w.date ? P.fmtDot(w.date) : '-'}</td><td>${esc(w.grade || '-')}</td><td><b>${esc(w.name || '-')}</b></td>
+        <td>${tel(w.phone)}</td><td class="memo">${esc(w.time)}</td><td class="memo">${esc(w.contact)}</td>
+        <td style="white-space:nowrap;text-align:right">
+          <button class="btn small" data-edit="${w.id}">수정</button>
+          <button class="btn small danger" data-remove="${w.id}">삭제</button></td></tr>`
+          )
+          .join('')
+      : '<tr><td colspan="7" class="empty">등록된 대기 학생이 없습니다.</td></tr>';
+    const on = (attr, fn) => $('wait-body').querySelectorAll(`[data-${attr}]`).forEach((b) => b.addEventListener('click', () => fn(b.dataset[attr])));
+    on('edit', (id) => {
+      fillWaitForm(findWait(id));
+      window.scrollTo(0, 0);
+    });
+    on('remove', (id) => {
+      const w = findWait(id);
+      const who = [w.grade, w.name].filter(Boolean).join(' ') || '이';
+      if (!confirm(`${who} 대기 학생을 목록에서 삭제할까요?`)) return;
+      state.waitlist = state.waitlist.filter((x) => x.id !== id);
+      save();
+      renderWaitlist();
+    });
+  }
+
   /* ---------- 전체 휴강 ---------- */
   let editingHolidayId = null;
 
@@ -518,6 +592,7 @@
   updateEventForm();
   updateStudentCount();
   fillForm(null);
+  fillWaitForm(null);
   show('dashboard');
 
   if (window.Cloud) {
