@@ -1,6 +1,20 @@
 {
- "updatedAt": "2026-10-27T05:12:08.592Z",
+ "updatedAt": "2026-10-30T00:10:01.602Z",
  "weeks": [
+  {
+   "monday": "2026-11-02",
+   "grades": {
+    "4": {
+     "seq": "34298900",
+     "title": "4학년- 11월 2일 ~ 11월 6일(12주)",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306004&viewBoardID=306004&boardSeq=34298900&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020504&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261030_092944395_78401.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261030_092944479_31525.jpg"
+     ]
+    }
+   }
+  },
   {
    "monday": "2026-10-26",
    "grades": {
