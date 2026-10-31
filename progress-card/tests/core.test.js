@@ -340,3 +340,15 @@ test('지음쌤 한마디 추천: 단원 마무리·평가 점수·새 단원 �
     '계획한 진도를 꾸준히 잘 나가고 있어요. 과제도 빠짐없이 해 와서 칭찬해 주고 싶어요. 다음 2주는 풀이 과정 꼼꼼히 쓰기를 목표로 할게요.');
   assert.equal(C.suggestNote({ name: '박서아' }, []), '');
 });
+
+test('리포트 이미지 줄 나누기: 띄어쓰기에서 나누고 · └ 줄은 머리 뒤에 맞춘다', () => {
+  const m = (t) => [...t].length * 10;
+  assert.deepEqual(C.wrapReport('가나 다라 마바\n\n    └ 디딤돌 3단원(합동과', m, 100), [
+    { text: '가나 다라 마바', indent: 0, blank: false },
+    { text: '', indent: 0, blank: true },
+    { text: '    └ 디딤돌', indent: 0, blank: false },
+    { text: '3단원(', indent: 60, blank: false }, // 남은 폭 40에 안 들어가 글자 단위로
+    { text: '합동과', indent: 60, blank: false },
+  ]);
+  assert.deepEqual(C.wrapReport('가나다라마바사아자차카', m, 50).map((r) => r.text), ['가나다라마', '바사아자차', '카']);
+});
