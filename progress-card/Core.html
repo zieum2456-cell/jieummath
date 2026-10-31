@@ -527,9 +527,12 @@
   const BOOK_TEXT = { 교재오답: '오답 학습지', 학습지오답: '학습지 오답', 개념다시쓰기: '개념 다시 쓰기', '교재오답-자료집': '자료집 오답 학습지' };
   const HOMEWORK_KEYS = ['완료', '50% 이상', '50% 미만', '미완', '안 함', '두고 옴'];
 
+  // 흐름 줄의 교재 이름: Test도 단원과 함께 쓴다 (2026-10-31)
+  const FLOW_BOOK_TEXT = { 단원Test: '단원 Test', 주간Test: '주간 Test' };
+  const FLOW_INDENT = '    └ ';
   /**
-   * 수업일마다 한 줄: '10/20(화) 유형 연습 · 디딤돌 3단원(합동과 대칭), 문장제 3단원(합동과 대칭)'
-   * 그날 오늘진도범위·추가포인트범위의 교재를 모두 쓰고(Test 제외), 단원 표시가 있으면 교재마다 단원 이름도.
+   * 수업일마다: '10/20(화) 유형 연습\n    └ 디딤돌 3단원(합동과 대칭), 문장제 3단원(합동과 대칭)'
+   * 그날 오늘진도범위·추가포인트범위의 교재(단원·주간 Test 포함)를 모두 쓰고, 단원 표시가 있으면 교재마다 단원 이름도.
    * stu: { grade, semester } 가 있으면 단원 이름도 (2026-10-31 단계 구간 → 일자별로 바꿈)
    */
   function flowLines(records, stu) {
@@ -541,17 +544,18 @@
       const stage = splitList(stageList(r.단계)).sort((a, b) => order(a) - order(b));
       const books = [];
       parseRangeList(r.오늘진도범위).concat(parseRangeList(r.추가포인트범위)).forEach((x) => {
-        if (!x.ok || /Test$/.test(x.book)) return;
+        if (!x.ok) return;
         const name = x.unit ? unitName(stu.grade, r.수업일, x.unit, stu.semester) : '';
-        const b = (BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` : '') + (name ? `(${name})` : '');
+        const b = (FLOW_BOOK_TEXT[x.book] || BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` : '') + (name ? `(${name})` : '');
         if (books.indexOf(b) < 0) books.push(b);
       });
       // 같은 날 단원이 있는 같은 교재가 있으면 단원 없는 이름은 뺀다 ('자료집 4단원, 자료집' → '자료집 4단원')
       const shown = books.filter((b) => b.indexOf(' ') >= 0 || !books.some((o) => o.startsWith(b + ' ')));
       if (!stage.length && !shown.length) return;
       const date = `${+r.수업일.slice(5, 7)}/${+r.수업일.slice(8, 10)}(${weekday(r.수업일)})`;
-      const parts = [stage.map((t) => STAGE_TEXT[t] || t).join(', '), shown.join(', ')].filter(Boolean);
-      lines.push(`${date} ${parts.join(' · ')}`);
+      // 첫 줄은 날짜와 학습 단계, 교재는 다음 줄에 들여 써서
+      const head = [date, stage.map((t) => STAGE_TEXT[t] || t).join(', ')].filter(Boolean).join(' ');
+      lines.push(head + (shown.length ? `\n${FLOW_INDENT}${shown.join(', ')}` : ''));
     });
     return lines;
   }
