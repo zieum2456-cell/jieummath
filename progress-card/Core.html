@@ -665,6 +665,39 @@
     return out.join('\n');
   }
 
+  /**
+   * 리포트 이미지용 줄 나누기: 문구 한 줄이 maxWidth를 넘으면 띄어쓰기에서 (안 되면 글자에서) 나누고,
+   * ' · ', '    └ ' 로 시작한 줄은 이어지는 줄을 그 머리 뒤에 맞춘다.
+   * measure(text) → 그린 폭(px). → [{ text, indent(px), blank }]
+   */
+  function wrapReport(text, measure, maxWidth) {
+    const out = [];
+    String(text).split('\n').forEach((line) => {
+      if (!line.trim()) return out.push({ text: '', indent: 0, blank: true });
+      const head = /^\s*(?:[·└]\s+)?/.exec(line)[0];
+      const indent = head ? measure(head) : 0;
+      const room = maxWidth - indent;
+      const rows = [];
+      let cur = '';
+      const byChar = (word) => [...word].forEach((ch) => {
+        if (cur && measure(cur + ch) > room) rows.push(cur), (cur = '');
+        cur += ch;
+      });
+      line.slice(head.length).split(/(\s+)/).filter(Boolean).forEach((tok) => {
+        if (measure(cur + tok) <= room) cur += tok;
+        else if (/^\s+$/.test(tok)) rows.push(cur), (cur = '');
+        else {
+          if (cur.trim()) rows.push(cur.trimEnd());
+          cur = '';
+          byChar(tok);
+        }
+      });
+      if (cur.trim() || !rows.length) rows.push(cur);
+      rows.forEach((r, k) => out.push(k ? { text: r.trimStart(), indent, blank: false } : { text: head + r, indent: 0, blank: false }));
+    });
+    return out;
+  }
+
   /** CSV 한 칸 (쉼표·따옴표·줄바꿈이 있으면 따옴표로 감싼다) */
   const csvCell = (v) => {
     const s = String(v == null ? '' : v);
@@ -677,7 +710,7 @@
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
     validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, nextClassDate, toSheets,
     LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
-    UNITS, SEMESTERS, semesterOf, unitName, suggestNote, LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, parentReport,
+    UNITS, SEMESTERS, semesterOf, unitName, suggestNote, LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, parentReport, wrapReport,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.Core = api;

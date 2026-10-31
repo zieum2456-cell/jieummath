@@ -1133,6 +1133,45 @@
     renderReport(st, recs);
   }
 
+  /*
+   * 리포트 문구 이미지 (2026-10-31): 수업 후기 이미지처럼 흰 바탕에 글, 아래 가운데 지음수학 로고.
+   * 폭 1080px PNG, 줄이 길면 Core.wrapReport로 나눈다. → data URL
+   */
+  const IMG = { width: 1080, pad: 68, size: 34, line: 1.8, font: '"Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif', logoW: 330 };
+  let logoImg = null;
+  const loadLogo = () => logoImg || (logoImg = new Promise((ok) => {
+    const im = new Image();
+    im.onload = () => ok(im);
+    im.onerror = () => ok(null);
+    im.src = window.REVIEW_LOGO || '';
+  }));
+  async function reportImage(text) {
+    const fontOf = (bold) => `${bold ? 700 : 400} ${IMG.size}px ${IMG.font}`;
+    try {
+      await Promise.all([document.fonts.load(fontOf(false), '가'), document.fonts.load(fontOf(true), '가')]);
+    } catch (e) { /* 글꼴을 못 불러오면 기본 글꼴로 */ }
+    const logo = await loadLogo();
+    const cv = document.createElement('canvas');
+    const ctx = cv.getContext('2d');
+    ctx.font = fontOf(false);
+    const rows = C.wrapReport(text, (t) => ctx.measureText(t).width, IMG.width - IMG.pad * 2);
+    const lh = IMG.size * IMG.line;
+    const logoH = logo ? Math.round(IMG.logoW * logo.height / logo.width) : 0;
+    cv.width = IMG.width;
+    cv.height = Math.ceil(IMG.pad + rows.length * lh + (logo ? IMG.pad * 0.8 + logoH : 0) + IMG.pad);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#222222';
+    ctx.textBaseline = 'middle';
+    rows.forEach((r, i) => {
+      if (r.blank) return;
+      ctx.font = fontOf(i === 0); // 첫 줄(제목)만 굵게
+      ctx.fillText(r.text, IMG.pad + r.indent, IMG.pad + i * lh + lh / 2);
+    });
+    if (logo) ctx.drawImage(logo, (IMG.width - IMG.logoW) / 2, cv.height - IMG.pad - logoH, IMG.logoW, logoH);
+    return cv.toDataURL('image/png');
+  }
+
   /* 학부모 2주 리포트: 기록으로 문구를 만들고, 지음쌤 한마디는 추천 문구를 채워 두고 원장님이 고친다 */
   const reportStu = (st) => ({ name: st ? st.name : '', times: st ? st.times : '', grade: st ? st.grade : '', semester: st ? st.semester : '' });
   // 고친 한마디는 학생·기간별로 이 브라우저에 남긴다 (없으면 추천 문구)
@@ -1153,11 +1192,38 @@
       <label>지음쌤 한마디 <span class="muted" id="report-note-state">${saved != null && saved !== suggested ? '고친 문구' : '추천 문구 (기간 기록으로 자동 작성, 바로 고칠 수 있어요)'}</span>
         <textarea id="report-note" rows="4" placeholder="잘한 점 → 다음 2주 목표">${esc(note)}</textarea></label>
       <div class="row"><button class="btn small" id="report-note-reset">추천 문구로 되돌리기</button></div>
-      <h3>보낼 문구</h3><textarea id="report-text" class="report-text" rows="${reportText(st, recs, note).split('\n').length + 2}" readonly>${esc(reportText(st, recs, note))}</textarea>
-      <div class="row"><button class="btn primary" id="report-copy">문구 복사</button></div></div>`;
+      <div class="report-grid">
+        <div><h3>보낼 문구</h3><textarea id="report-text" class="report-text" rows="${reportText(st, recs, note).split('\n').length + 2}" readonly>${esc(reportText(st, recs, note))}</textarea>
+          <div class="row"><button class="btn primary" id="report-copy">문구 복사</button></div></div>
+        <div><h3>문구 이미지</h3><img id="report-img" class="report-img" alt="보낼 문구를 넣은 이미지">
+          <div class="row"><button class="btn primary" id="report-img-save">이미지 저장</button><button class="btn" id="report-img-copy">이미지 복사</button></div>
+          <p class="muted">휴대폰에서는 이미지를 길게 눌러 저장할 수도 있어요.</p></div>
+      </div></div>`;
+    const drawImg = () => reportImage($('report-text').value).then((url) => ($('report-img').src = url));
+    drawImg();
+    $('report-img-save').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = $('report-img').src;
+      a.download = `리포트_${st ? st.name : S.stuNo}_${(S.period.to || today()).replace(/-/g, '')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+    $('report-img-copy').addEventListener('click', async () => {
+      try {
+        const blob = await (await fetch($('report-img').src)).blob();
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        toast('이미지를 복사했습니다. 카톡에 붙여 넣으세요.');
+      } catch (e) {
+        toast('이 브라우저에서는 이미지 복사가 안 됩니다. [이미지 저장]을 써 주세요.');
+      }
+    });
+    let timer = null;
     const update = (v) => {
       $('report-text').value = reportText(st, recs, v);
       $('report-text').rows = $('report-text').value.split('\n').length + 2;
+      clearTimeout(timer);
+      timer = setTimeout(drawImg, 300);
       $('report-note-state').textContent = v === suggested ? '추천 문구 (기간 기록으로 자동 작성, 바로 고칠 수 있어요)' : '고친 문구';
     };
     $('report-note').addEventListener('input', (e) => {

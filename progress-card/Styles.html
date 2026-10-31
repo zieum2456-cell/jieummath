@@ -43,6 +43,10 @@
   .btn.small { min-height: 34px; padding: 4px 12px; font-size: 14px; }
   .muted.small { font-size: 12px; }
   .report-text { width: 100%; resize: vertical; font-family: inherit; font-size: 14px; line-height: 1.5; }
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .report-grid > div { min-width: 0; }
+  .report-img { display: block; width: 100%; border: 1px solid var(--line, #ddd); border-radius: 8px; background: #fff; }
+  @media (max-width: 760px) { .report-grid { grid-template-columns: 1fr; } }
   .talks { margin: 6px 0 10px; padding-left: 18px; }
   .btn:disabled { opacity: .45; cursor: default; }
   .btn.danger { color: var(--danger); }
