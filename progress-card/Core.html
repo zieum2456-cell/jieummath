@@ -532,7 +532,7 @@
   const FLOW_INDENT = '    └ ';
   /**
    * 수업일마다: '10/20(화) 유형 연습\n    └ 디딤돌 3단원(합동과 대칭), 문장제 3단원(합동과 대칭)'
-   * 그날 오늘진도범위·추가포인트범위의 교재(단원·주간 Test 포함)를 모두 쓰고, 단원 표시가 있으면 교재마다 단원 이름도.
+   * 그날 지난과제범위(○·△만)·오늘진도범위·추가포인트범위의 교재(단원·주간 Test 포함)를 모두 쓰고, 단원 표시가 있으면 교재마다 단원 이름도.
    * stu: { grade, semester } 가 있으면 단원 이름도 (2026-10-31 단계 구간 → 일자별로 바꿈)
    */
   function flowLines(records, stu) {
@@ -543,7 +543,9 @@
     rs.forEach((r) => {
       const stage = splitList(stageList(r.단계)).sort((a, b) => order(a) - order(b));
       const books = [];
-      parseRangeList(r.오늘진도범위).concat(parseRangeList(r.추가포인트범위)).forEach((x) => {
+      // 지난 과제는 끝냈거나(○) 하다 멈춘(△) 것만
+      const past = parseRangeList(r.지난과제범위).filter((x) => x.mark);
+      past.concat(parseRangeList(r.오늘진도범위), parseRangeList(r.추가포인트범위)).forEach((x) => {
         if (!x.ok) return;
         const name = x.unit ? unitName(stu.grade, r.수업일, x.unit, stu.semester) : '';
         const b = (FLOW_BOOK_TEXT[x.book] || BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` : '') + (name ? `(${name})` : '');
