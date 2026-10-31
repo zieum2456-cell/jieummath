@@ -70,7 +70,7 @@ test('2026-10-21 교재 8종·경시대회, 페이지 앞 p는 그대로 둔다'
   assert.equal(C.parseRangeItem('개념다시쓰기(3)[p58~63]').range, 'p58~63');
   assert.equal(C.parseRangeItem('경시[기출 연습]').book, '경시'); // 예전 기록
   const recs = [{ 수업일: '2026-10-20', 출결: '정규', 단계: '개념', 오늘진도범위: '탄탄북(3)[10~12]○; 학습지오답(3)[]○; 경시대회[기출]○' }];
-  assert.ok(C.parentReport({ name: '김하린', grade: '초5' }, recs).includes(' · 10/20 개념 학습 · 탄탄북 3단원(합동과 대칭), 학습지 오답 3단원(합동과 대칭), 경시대회\n'));
+  assert.ok(C.parentReport({ name: '김하린', grade: '초5' }, recs).includes(' · 10/20(화) 개념 학습\n    └ 탄탄북 3단원(합동과 대칭), 학습지 오답 3단원(합동과 대칭), 경시대회\n'));
 });
 
 test('열 이름·순서 오류는 몇 번째 열인지 알려 준다', () => {
@@ -275,11 +275,11 @@ test('학부모 리포트: 출석 n/n회 뒤에 지각 횟수, 지각한 날 등
   assert.equal(lines[0], '[지음수학] 하린이 2주 학습 리포트 (10/16~10/29)');
   // 10/22는 기록의 수업시간(분), 10/29는 기록에 없어 등·하원으로 계산
   assert.deepEqual(lines.slice(2, 5), ['📅 출석 4/4회 · 지각 2회', ' · 10/22(목) 등원 16:12 · 하원 17:40 (88분)', ' · 10/29(목) 등원 16:20 · 하원 17:45 (85분)']);
-  assert.ok(lines.includes(' · 10/20 유형 연습 · 디딤돌 3단원(합동과 대칭)'));
-  assert.ok(lines.includes(' · 10/27 오답 다시 풀기, 단원 평가 · 오답 학습지 3단원(합동과 대칭)'));
-  assert.ok(lines.includes(' · 10/29 개념 학습 · 디딤돌 4단원(소수의 곱셈)'));
+  assert.ok(text.includes(' · 10/20(화) 유형 연습\n    └ 디딤돌 3단원(합동과 대칭)\n'));
+  assert.ok(text.includes(' · 10/27(화) 오답 다시 풀기, 단원 평가\n    └ 오답 학습지 3단원(합동과 대칭), 단원 Test 3단원(합동과 대칭)\n'));
+  assert.ok(text.includes(' · 10/29(목) 개념 학습\n    └ 디딤돌 4단원(소수의 곱셈)\n'));
   // 학년을 모르면 단원 번호만
-  assert.ok(C.parentReport({ name: '김하린' }, HARIN).includes(' · 10/20 유형 연습 · 디딤돌 3단원\n'));
+  assert.ok(C.parentReport({ name: '김하린' }, HARIN).includes(' · 10/20(화) 유형 연습\n    └ 디딤돌 3단원\n'));
   assert.ok(lines.includes('✏️ 과제 완료율 75% (완료 2회, 50% 이상 1회, 50% 미만 1회)'));
   assert.ok(lines.includes('⭐ 추가 포인트 12점'));
   assert.ok(lines.includes('🎯 집중해서 연습한 것: 계산 실수 줄이기, 풀이 과정 쓰기'));
@@ -288,6 +288,22 @@ test('학부모 리포트: 출석 n/n회 뒤에 지각 횟수, 지각한 날 등
   assert.ok(C.parentReport({ name: '김하린', times: '화 16:30, 목 16:30' }, HARIN).includes('📅 출석 4/4회 · 지각 없음'));
   const noTimes = C.parentReport({ name: '김하린', times: '' }, [...HARIN, { 수업일: '2026-10-30', 출결: '결강' }]);
   assert.ok(noTimes.includes('📅 출석 4/5회\n') && !noTimes.includes('지각'));
+  assert.ok(noTimes.includes('📅 출석 4/5회\n · 10/30(금) 결강\n')); // 사유가 없으면 날짜만
+  assert.ok(text.endsWith('수업 진행과 관련하여 궁금하신 점은 언제든 편하게 말씀해 주세요 :)'));
+});
+
+test('학부모 리포트: 결강한 날과 사유(지음쌤 톡톡)는 출석 줄 바로 아래, 지각 줄보다 먼저', () => {
+  const recs = [...HARIN, { 수업일: '2026-10-24', 출결: '결강', 학습태도: '가족 여행' }];
+  const lines = C.parentReport({ name: '김하린', times: '화 16:00, 목 16:00', grade: '초5' }, recs).split('\n');
+  assert.deepEqual(lines.slice(2, 5), ['📅 출석 4/5회 · 지각 2회', ' · 10/24(토) 결강 (가족 여행)', ' · 10/22(목) 등원 16:12 · 하원 17:40 (88분)']);
+});
+
+test('이번 2주 흐름: 수업일마다 교재를 모두, 단원 있는 같은 교재가 있으면 단원 없는 이름은 뺀다', () => {
+  const recs = [{ 수업일: '2026-10-23', 출결: '정규', 단계: '단원마무리', 오늘진도범위: '자료집(3)[1~2]○; 자료집(4)[3]; 자료집()[5]', 추가포인트범위: '' },
+    { 수업일: '2026-10-24', 출결: '정규', 단계: '', 오늘진도범위: '', 추가포인트범위: '문장제()[10]○' }];
+  assert.deepEqual(C.flowLines(recs, { grade: '초5' }), ['10/23(금) 단원 마무리\n    └ 자료집 3단원(합동과 대칭), 자료집 4단원(소수의 곱셈)', '10/24(토)\n    └ 문장제']);
+  const t = [{ 수업일: '2026-10-30', 출결: '정규', 단계: '평가', 오늘진도범위: '주간Test(2)[]○' }];
+  assert.deepEqual(C.flowLines(t, { grade: '초5' }), ['10/30(금) 단원 평가\n    └ 주간 Test 2단원(분수의 곱셈)']);
 });
 
 test('단원 이름: 3~6학년, 수업일 기준 학기(2~7월 1학기) 또는 학생별로 고정한 학기', () => {
