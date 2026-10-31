@@ -1,17 +1,23 @@
 {
- "updatedAt": "2026-10-30T02:01:35.851Z",
+ "updatedAt": "2026-10-31T00:25:01.065Z",
  "weeks": [
   {
    "monday": "2026-11-02",
    "grades": {
+    "3": {
+     "seq": "34300898",
+     "title": "11월 2일~11월 6일 주간학습안내(2학기 12주)",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306002&viewBoardID=306002&boardSeq=34300898&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020503&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261030_135909660_78543.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261030_135920334_52099.jpg"
+     ]
+    },
     "4": {
      "seq": "34298900",
      "title": "4학년- 11월 2일 ~ 11월 6일(12주)",
      "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306004&viewBoardID=306004&boardSeq=34298900&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020504&s=haden",
-     "images": [
-      "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261030_092944395_78401.jpg",
-      "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261030_092944479_31525.jpg"
-     ],
+     "images": [],
      "extract": {
       "from": [
        "https://haedeun.icees.kr/upload/keditor/haden/306004/2026/10/20261030_092944395_78401.jpg",
@@ -77,6 +83,26 @@
       },
       "guessed": []
      }
+    },
+    "5": {
+     "seq": "34300694",
+     "title": "5학년_11월2일 - 11월6일(12주)",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306006&viewBoardID=306006&boardSeq=34300694&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020505&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259097_05114.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259158_26829.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259211_50843.jpg",
+      "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259260_88064.jpg"
+     ]
+    },
+    "6": {
+     "seq": "34299350",
+     "title": "6학년 2학기 12주 (11.2~11.6) 주간학습안내",
+     "url": "https://haedeun.icees.kr/boardCnts/view.do?boardID=306008&viewBoardID=306008&boardSeq=34299350&lev=0&action=view&searchType=S&statusYN=W&page=1&m=020506&s=haden",
+     "images": [
+      "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261030_103102644_60412.png",
+      "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261030_103119753_25416.png"
+     ]
     }
    }
   },
