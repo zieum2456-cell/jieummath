@@ -527,27 +527,33 @@
   const BOOK_TEXT = { 교재오답: '오답 학습지', 학습지오답: '학습지 오답', 개념다시쓰기: '개념 다시 쓰기', '교재오답-자료집': '자료집 오답 학습지' };
   const HOMEWORK_KEYS = ['완료', '50% 이상', '50% 미만', '미완', '안 함', '두고 옴'];
 
-  /** 단계가 바뀐 구간마다 한 줄: '10/20 유형 연습 · 디딤돌 3단원(합동과 대칭)'. stu: { grade, semester } 가 있으면 단원 이름도 */
+  /**
+   * 수업일마다 한 줄: '10/20(화) 유형 연습 · 디딤돌 3단원(합동과 대칭), 문장제 3단원(합동과 대칭)'
+   * 그날 오늘진도범위·추가포인트범위의 교재를 모두 쓰고(Test 제외), 단원 표시가 있으면 교재마다 단원 이름도.
+   * stu: { grade, semester } 가 있으면 단원 이름도 (2026-10-31 단계 구간 → 일자별로 바꿈)
+   */
   function flowLines(records, stu) {
     stu = stu || {};
     const rs = [...records].filter((r) => r.출결 !== '결강').sort((a, b) => a.수업일.localeCompare(b.수업일));
     const order = (t) => (ENUMS.단계.indexOf(t) < 0 ? 99 : ENUMS.단계.indexOf(t));
     const lines = [];
     rs.forEach((r) => {
-      const stage = splitList(r.단계).sort((a, b) => order(a) - order(b));
-      const key = stage.join('·');
-      if (!key) return;
-      let last = lines[lines.length - 1];
-      if (!last || last.key !== key) lines.push((last = { key, date: r.수업일, stage, books: [] }));
-      parseRangeList(r.오늘진도범위).forEach((x) => {
+      const stage = splitList(stageList(r.단계)).sort((a, b) => order(a) - order(b));
+      const books = [];
+      parseRangeList(r.오늘진도범위).concat(parseRangeList(r.추가포인트범위)).forEach((x) => {
         if (!x.ok || /Test$/.test(x.book)) return;
         const name = x.unit ? unitName(stu.grade, r.수업일, x.unit, stu.semester) : '';
         const b = (BOOK_TEXT[x.book] || x.book) + (x.unit ? ` ${x.unit}단원` : '') + (name ? `(${name})` : '');
-        if (last.books.indexOf(b) < 0) last.books.push(b);
+        if (books.indexOf(b) < 0) books.push(b);
       });
+      // 같은 날 단원이 있는 같은 교재가 있으면 단원 없는 이름은 뺀다 ('자료집 4단원, 자료집' → '자료집 4단원')
+      const shown = books.filter((b) => b.indexOf(' ') >= 0 || !books.some((o) => o.startsWith(b + ' ')));
+      if (!stage.length && !shown.length) return;
+      const date = `${+r.수업일.slice(5, 7)}/${+r.수업일.slice(8, 10)}(${weekday(r.수업일)})`;
+      const parts = [stage.map((t) => STAGE_TEXT[t] || t).join(', '), shown.join(', ')].filter(Boolean);
+      lines.push(`${date} ${parts.join(' · ')}`);
     });
-    return lines.map((l) => `${+l.date.slice(5, 7)}/${+l.date.slice(8, 10)} ${l.stage.map((t) => STAGE_TEXT[t] || t).join(', ')}`
-      + (l.books.length ? ` · ${l.books.join(', ')}` : ''));
+    return lines;
   }
 
   /** 받침이 있으면 a, 없으면 b ('과'/'와', '을'/'를') */
@@ -634,6 +640,11 @@
     const late = Object.keys(parseTimes(stu.times)).length ? lateList(rs, stu.times) : null;
     if (head && late) head += late.length ? ` · 지각 ${late.length}회` : ' · 지각 없음';
     if (head) out.push(head);
+    // 결강한 날과 사유 (사유는 그날 카드의 지음쌤 톡톡, 없으면 날짜만)
+    rs.filter((r) => r.출결 === '결강').forEach((r) => {
+      const why = String(r.학습태도 || '').trim();
+      out.push(` · ${mdw(r.수업일)} 결강${why ? ` (${why})` : ''}`);
+    });
     (late || []).forEach((x) => out.push(` · ${mdw(x.date)} 등원 ${x.in} · 하원 ${x.out || '-'}${x.minutes ? ` (${x.minutes}분)` : ''}`));
     const flow = flowLines(rs, stu);
     if (flow.length) out.push('📈 이번 2주 흐름', ...flow.map((l) => ` · ${l}`));
@@ -644,7 +655,7 @@
     }
     if (st.points) out.push(`⭐ 추가 포인트 ${st.points}점`);
     if (st.errors.length) out.push(`🎯 집중해서 연습한 것: ${st.errors.slice(0, 2).map(([t]) => FOCUS_TEXT[t] || t).join(', ')}`);
-    out.push('', '💬 지음쌤 한마디', String(opts.note || '').trim() || '(여기에 적어 주세요)', '', '궁금한 점은 언제든 편하게 말씀해 주세요.');
+    out.push('', '💬 지음쌤 한마디', String(opts.note || '').trim() || '(여기에 적어 주세요)', '', '수업 진행과 관련하여 궁금하신 점은 언제든 편하게 말씀해 주세요 :)');
     return out.join('\n');
   }
 
