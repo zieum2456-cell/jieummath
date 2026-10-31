@@ -626,6 +626,16 @@
     return out.join(' ');
   }
 
+  /** 진행률 값별 횟수 → [['75~100%', 2], ['50~75%', 1]] (높은 값부터, 0회와 빈 값은 빼고) */
+  function progressCounts(records) {
+    const counts = {};
+    records.forEach((r) => {
+      const v = String(r.진행률 || '').trim();
+      if (r.출결 !== '결강' && ENUMS.진행률.indexOf(v) >= 0) counts[v] = (counts[v] || 0) + 1;
+    });
+    return [...ENUMS.진행률].reverse().filter((k) => counts[k]).map((k) => [k, counts[k]]);
+  }
+
   /**
    * 학부모 2주 리포트 카톡 문구
    * stu: { name, times, grade, semester }, records: 그 학생의 기간 안 기록, opts: { from, to, leftMode, note }
@@ -659,6 +669,9 @@
       const parts = HOMEWORK_KEYS.filter((k) => h.counts[k]).map((k) => `${k} ${h.counts[k]}회`);
       out.push(`✏️ 과제 완료율 ${Math.round(h.rate * 100)}% (${parts.join(', ')})`);
     }
+    // 학습 목표 진행률: 값별 횟수 (75~100% → 50~75% → 50% 미만, 0회·빈 값은 빼고, 셀 기록이 없으면 줄 없음)
+    const prog = progressCounts(rs);
+    if (prog.length) out.push(`📊 학습 목표 진행률: ${prog.map(([k, n]) => `${k} ${n}회`).join(', ')}`);
     if (st.points) out.push(`⭐ 추가 포인트 ${st.points}점`);
     if (st.errors.length) out.push(`🎯 집중해서 연습한 것: ${st.errors.slice(0, 2).map(([t]) => FOCUS_TEXT[t] || t).join(', ')}`);
     out.push('', '💬 지음쌤 한마디', String(opts.note || '').trim() || '(여기에 적어 주세요)', '', '수업 진행과 관련하여 궁금하신 점은 언제든 편하게 말씀해 주세요 :)');
@@ -710,7 +723,7 @@
     nfc, splitList, parseRangeItem, parseRangeList, parseCsv, readCsv, validDate, timeToMin, nameMatches, cardKey,
     validateCard, canonical, rankOf, normalizeNo, normalizeDays, parseRosterText, diffRoster, studentsOn, nextClassDate, toSheets,
     LEVELS, GROUPS, GRADES, LEFT_WEIGHT, addDays, weekday, periodRange, inPeriod, homework, stageChanges, summarize, csvCell, toCsv,
-    UNITS, SEMESTERS, semesterOf, unitName, suggestNote, LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, parentReport, wrapReport,
+    UNITS, SEMESTERS, semesterOf, unitName, suggestNote, LATE_GRACE, parseTimes, timesText, lateList, callName, flowLines, progressCounts, parentReport, wrapReport,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.Core = api;
