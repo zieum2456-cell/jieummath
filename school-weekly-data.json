@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-31T00:25:01.065Z",
+ "updatedAt": "2026-10-31T00:42:30.010Z",
  "weeks": [
   {
    "monday": "2026-11-02",
@@ -11,7 +11,67 @@
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261030_135909660_78543.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261030_135920334_52099.jpg"
-     ]
+     ],
+     "extract": {
+      "from": [
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261030_135909660_78543.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306002/2026/10/20261030_135920334_52099.jpg"
+      ],
+      "plan": "school-weekly/2026-11-02/3.jpg",
+      "timetable": 1,
+      "math": {
+       "1": [
+        "수",
+        "목",
+        "금"
+       ],
+       "2": [
+        "월",
+        "금"
+       ],
+       "3": [
+        "월",
+        "수",
+        "목"
+       ],
+       "4": [
+        "화",
+        "수",
+        "금"
+       ],
+       "5": [
+        "월",
+        "수",
+        "목"
+       ],
+       "6": [
+        "화",
+        "목",
+        "금"
+       ],
+       "7": [
+        "월",
+        "수",
+        "목"
+       ],
+       "8": [
+        "월",
+        "수",
+        "목"
+       ],
+       "9": [
+        "화",
+        "수",
+        "목"
+       ],
+       "10": [
+        "월",
+        "수",
+        "목"
+       ]
+      },
+      "guessed": []
+     }
     },
     "4": {
      "seq": "34298900",
@@ -93,7 +153,78 @@
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259158_26829.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259211_50843.jpg",
       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259260_88064.jpg"
-     ]
+     ],
+     "extract": {
+      "from": [
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259097_05114.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259158_26829.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259211_50843.jpg",
+       "https://haedeun.icees.kr/upload/keditor/haden/306006/2026/10/20261030_134259260_88064.jpg"
+      ],
+      "plan": "school-weekly/2026-11-02/5.jpg",
+      "timetable": 2,
+      "math": {
+       "1": [
+        "월",
+        "화",
+        "수",
+        "목"
+       ],
+       "2": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "3": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "4": [
+        "월",
+        "화",
+        "목",
+        "금"
+       ],
+       "5": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "6": [
+        "월",
+        "화"
+       ],
+       "7": [
+        "화",
+        "금"
+       ],
+       "8": [
+        "월",
+        "금"
+       ],
+       "9": [
+        "월",
+        "수"
+       ],
+       "10": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ],
+       "11": [
+        "월",
+        "수",
+        "목",
+        "금"
+       ]
+      },
+      "guessed": []
+     }
     },
     "6": {
      "seq": "34299350",
@@ -102,7 +233,56 @@
      "images": [
       "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261030_103102644_60412.png",
       "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261030_103119753_25416.png"
-     ]
+     ],
+     "extract": {
+      "from": [
+       "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261030_103102644_60412.png",
+       "https://haedeun.icees.kr/upload/keditor/haden/306008/2026/10/20261030_103119753_25416.png"
+      ],
+      "plan": "school-weekly/2026-11-02/6.jpg",
+      "timetable": 1,
+      "math": {
+       "1": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "2": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "4": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "5": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "8": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ],
+       "9": [
+        "화",
+        "수",
+        "목",
+        "금"
+       ]
+      },
+      "guessed": [
+       9
+      ]
+     }
     }
    }
   },
